@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#00002e">
+
+<title>TopWin — Flip the cards, claim your bonus!</title>
+<meta name="description" content="Flip the cards, find the three with the 650% bonus and claim a 650% + 250 free spins welcome bonus at TopWin.">
+
+<link rel="alternate" hreflang="uk" href="./index.html">
+<link rel="alternate" hreflang="ru" href="./ru.html">
+<link rel="alternate" hreflang="en" href="./en.html">
+<link rel="alternate" hreflang="x-default" href="./en.html">
+
+<!-- The headline face only. crossorigin is required even same-origin: without
+     it the preload is discarded and the font is fetched a second time.
+     en.html swaps this for the -latin cut. -->
+<link rel="preload" as="font" type="font/woff2" crossorigin
+      href="assets/fonts/roboto-var-black-italic-latin.woff2">
+
+<link rel="stylesheet" href="css/styles.css">
+<noscript><style>.fc-claim { display: block; }</style></noscript>
+</head>
+<body>
+
+<div class="fc-root">
+
+  <main class="fc-hero">
+
+    <picture class="fc-hero__bg">
+      <!-- Order matters: both desktop entries carry media and come first,
+           the mobile crop follows with none. First match wins, so reversing
+           this makes every desktop visitor download the 375px mobile image. -->
+      <source media="(min-width: 900px)" type="image/avif"
+              srcset="assets/img/hero-1280.avif 1280w, assets/img/hero-1920.avif 1920w"
+              sizes="100vw">
+      <source media="(min-width: 900px)" type="image/webp"
+              srcset="assets/img/hero-1280.webp 1280w, assets/img/hero-1920.webp 1920w"
+              sizes="100vw">
+      <source type="image/avif" srcset="assets/img/hero-m-375.avif">
+      <source type="image/webp" srcset="assets/img/hero-m-375.webp">
+      <img src="assets/img/hero-1280.webp" alt="" width="1920" height="1080"
+           fetchpriority="high" decoding="async">
+    </picture>
+
+    <div class="fc-stage">
+
+      <div class="fc-copy">
+        <div class="fc-plate">
+          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="255" height="46">
+        </div>
+        <h1 class="fc-headline">
+          <span class="fc-headline__a" data-i18n="hero.1">Flip the cards</span>
+          <span class="fc-headline__b" data-i18n="hero.2">claim your bonus!</span>
+        </h1>
+      </div>
+
+      <section class="fc-game" aria-labelledby="fc-game-label">
+        <h2 class="fc-sr" id="fc-game-label" data-i18n="game.label">Find the three cards with the 650% bonus and claim your welcome bonus</h2>
+
+        <!-- The nine cards are built by js/flip.js from CONFIG.deck. Their
+             prizes are shuffled on every load, their positions never are. -->
+        <ul class="fc-grid" id="fc-grid"></ul>
+
+        <div class="fc-progress" id="fc-progress" aria-hidden="true">
+          <span class="fc-pip"></span><span class="fc-pip"></span><span class="fc-pip"></span>
+        </div>
+
+        <p class="fc-sr" id="fc-status" role="status" aria-live="polite"></p>
+
+        <button class="fc-claim" id="fc-claim" type="button" data-i18n="cta.claim">Claim bonus</button>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="fc-footer">
+    <div class="fc-footer__in">
+
+      <div class="fc-footer__top">
+        <div class="fc-fgroup">
+          <p class="fc-flabel" data-i18n="footer.social">Follow us</p>
+          <div class="fc-frow">
+            <!-- IT: real profile URLs go in these five href attributes. -->
+            <a class="fc-social" href="#" aria-label="Telegram"><img src="assets/img/icons/social-telegram.svg" alt="" width="20" height="20"></a>
+            <a class="fc-social" href="#" aria-label="YouTube"><img src="assets/img/icons/social-youtube.svg" alt="" width="20" height="20"></a>
+            <a class="fc-social" href="#" aria-label="TikTok"><img src="assets/img/icons/social-tiktok.svg" alt="" width="20" height="20"></a>
+            <a class="fc-social" href="#" aria-label="Instagram"><img src="assets/img/icons/social-instagram.svg" alt="" width="20" height="20"></a>
+            <a class="fc-social" href="#" aria-label="Facebook"><img src="assets/img/icons/social-facebook.svg" alt="" width="20" height="20"></a>
+          </div>
+        </div>
+
+        <div class="fc-fgroup fc-fgroup--end">
+          <p class="fc-flabel" data-i18n="footer.payments">Payment methods</p>
+          <div class="fc-frow">
+            <span class="fc-pay"><img src="assets/img/icons/pay-visa.svg" alt="Visa" width="74" height="24"></span>
+            <span class="fc-pay"><img src="assets/img/icons/pay-mastercard.svg" alt="Mastercard" width="39" height="24"></span>
+            <span class="fc-pay"><img src="assets/img/icons/pay-tether.svg" alt="Tether" width="24" height="24"></span>
+            <span class="fc-pay"><img src="assets/img/icons/pay-bitcoin.svg" alt="Bitcoin" width="24" height="24"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="fc-divider"></div>
+
+      <div class="fc-footer__bottom">
+        <p data-i18n="footer.rights">© 2026 All rights reserved</p>
+        <span class="fc-footer__logo">
+          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="96" height="17">
+        </span>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- ======================================================================
+       Registration form.
+
+       IT: this is the piece you wire up. Two ways, pick one:
+         A. set action and method on this form and the browser submits it
+         B. leave action empty and set CONFIG.onRegister in js/flip.js
+       With neither, nothing is sent and the payload goes to the console.
+       See README.md section 2.
+       ====================================================================== -->
+  <dialog class="fc-modal" id="fc-signup" aria-labelledby="fc-offer-title">
+    <form class="fc-form" id="fc-form" novalidate action="" method="post">
+
+      <button class="fc-close" id="fc-close" type="button" autofocus
+              aria-label="Close" data-i18n-aria="modal.close">&times;</button>
+
+      <img class="fc-form__logo" src="assets/img/logo-topwin.svg" alt="TopWin" width="247" height="44">
+
+      <div class="fc-offer">
+        <p class="fc-offer__title" id="fc-offer-title" data-i18n="form.title">Welcome bonus</p>
+        <p class="fc-sr" data-i18n="form.offerSr">Bonus of 650 percent and 250 free spins</p>
+        <div class="fc-offer__row" aria-hidden="true">
+          <span class="fc-offer__pct">650%</span>
+          <span class="fc-offer__side">
+            <span class="fc-offer__num">+250</span>
+            <span class="fc-offer__spins" data-i18n="form.spins">free spins</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="fc-tabs" role="tablist" aria-label="Registration method">
+        <button class="fc-tab" type="button" role="tab" id="fc-tab-phone"
+                aria-controls="fc-panel-phone" aria-selected="true"
+                data-i18n="form.tabPhone">Phone</button>
+        <button class="fc-tab" type="button" role="tab" id="fc-tab-email"
+                aria-controls="fc-panel-email" aria-selected="false" tabindex="-1"
+                data-i18n="form.tabEmail">Email</button>
+      </div>
+
+      <div class="fc-fields">
+
+        <div class="fc-field" id="fc-panel-phone" role="tabpanel" aria-labelledby="fc-tab-phone">
+          <label class="fc-sr" for="fc-phone" data-i18n="form.phoneLabel">Phone, country code +380</label>
+          <div class="fc-input">
+            <span class="fc-input__flag" aria-hidden="true">🇺🇦</span>
+            <span class="fc-input__dial" aria-hidden="true">+380</span>
+            <input id="fc-phone" name="phone" type="tel" inputmode="numeric"
+                   autocomplete="tel-national" placeholder="00 000 0000"
+                   aria-describedby="fc-err-phone">
+          </div>
+          <p class="fc-error" id="fc-err-phone" role="alert"></p>
+        </div>
+
+        <div class="fc-field" id="fc-panel-email" role="tabpanel" aria-labelledby="fc-tab-email" hidden>
+          <label class="fc-sr" for="fc-email">Email</label>
+          <div class="fc-input">
+            <input id="fc-email" name="email" type="email" inputmode="email"
+                   autocomplete="email" placeholder="you@example.com"
+                   aria-describedby="fc-err-email">
+          </div>
+          <p class="fc-error" id="fc-err-email" role="alert"></p>
+        </div>
+
+        <div class="fc-field">
+          <label class="fc-field__label" for="fc-password" data-i18n="form.passLabel">Password</label>
+          <div class="fc-input">
+            <input id="fc-password" name="password" type="password"
+                   autocomplete="new-password" placeholder="Enter password"
+                   data-i18n-placeholder="form.passHint"
+                   aria-describedby="fc-err-password">
+            <button class="fc-eye" id="fc-eye" type="button" aria-pressed="false"
+                    aria-controls="fc-password" aria-label="Show password"
+                    data-i18n-aria="form.showPass">
+              <img src="assets/img/icons/icon-eye.svg" alt="" width="20" height="20">
+            </button>
+          </div>
+          <p class="fc-error" id="fc-err-password" role="alert"></p>
+        </div>
+
+      </div>
+
+      <div class="fc-consent" id="fc-consent-row">
+        <input id="fc-consent" name="consent" type="checkbox" aria-describedby="fc-err-consent">
+        <label class="fc-consent__box" for="fc-consent">
+          <img src="assets/img/icons/icon-check.svg" alt="" width="10" height="10">
+        </label>
+        <label for="fc-consent" data-i18n="form.consent">I am 18 years old and I accept the
+          <a href="#" id="fc-terms">Terms of Use</a> and
+          <a href="#" id="fc-privacy">Privacy Policy</a>.
+        </label>
+      </div>
+      <p class="fc-error fc-error--consent" id="fc-err-consent" role="alert"></p>
+
+      <div class="fc-actions">
+        <button class="fc-submit" type="submit" data-i18n="form.submit">Register</button>
+        <p class="fc-signin" data-i18n="form.haveAccount">Already have an account?
+          <a href="#" id="fc-login">Sign in</a>
+        </p>
+      </div>
+
+    </form>
+  </dialog>
+
+</div>
+
+<script src="js/flip.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# Text files are stored with LF in the repository, whatever the author's OS.
+# The IT team will most likely check this out on Linux.
+* text=auto eol=lf
+
+*.png   binary
+*.webp  binary
+*.avif  binary
+*.woff2 binary

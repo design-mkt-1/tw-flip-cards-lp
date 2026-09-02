@@ -1,0 +1,65 @@
+name: Deploy to GitHub Pages
+
+# A preview URL for stakeholders. It is not the production deploy — the IT
+# team integrates these files into the real platform.
+#
+# Only the files the page actually serves are uploaded. raw/ holds the
+# untouched Figma exports that tools/optimize.py consumes, and neither is
+# ever requested by a browser.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The three language files must stay structurally identical
+        run: |
+          for f in index.html ru.html en.html; do
+            printf '%s: %s lines, %s tags\n' "$f" "$(wc -l < $f)" "$(grep -o '<' $f | wc -l)"
+          done
+          a=$(grep -o '<' index.html | wc -l)
+          for f in ru.html en.html; do
+            b=$(grep -o '<' $f | wc -l)
+            if [ "$a" != "$b" ]; then
+              echo "::error::$f has $b tags, index.html has $a. The files have drifted."
+              echo "Compare them with: git diff --no-index --word-diff index.html $f"
+              exit 1
+            fi
+          done
+
+      - name: Stage the served files
+        run: |
+          mkdir -p _site
+          cp -r index.html ru.html en.html .nojekyll css js assets _site/
+          du -sh _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

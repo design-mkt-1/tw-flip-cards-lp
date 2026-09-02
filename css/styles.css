@@ -1,0 +1,1173 @@
+@charset "UTF-8";
+/* ==========================================================================
+   TopWin — Flip the Cards
+   One stylesheet. No build step, no preprocessor.
+
+   CONTENTS
+     0. PAGE HOST        the only rules that touch html/body — see note
+     1. SCOPED RESET     everything else is confined to .fc-root
+     2. FONTS
+     3. TOKENS
+     4. SCALE            --u and --cu, the two numbers everything derives from
+     5. LAYOUT           hero shell and background
+     6. BRAND            logo plate and headline
+     7. GRID
+     8. CARD
+     9. FOOTER
+    10. MODAL + FORM
+    11. UTILITIES
+    12. REDUCED MOTION
+
+   EMBEDDING THIS IN AN EXISTING PAGE
+     Delete section 0. Nothing else in this file can affect the host page:
+     every selector is scoped to .fc-root and every class starts with "fc-".
+   ========================================================================== */
+
+
+/* ==========================================================================
+   0. PAGE HOST — delete this section when embedding
+   ========================================================================== */
+
+html {
+  scrollbar-gutter: stable;   /* locking scroll for the modal must not shift the page */
+}
+
+body {
+  margin: 0;
+  background: #00002e;
+}
+
+
+/* ==========================================================================
+   1. SCOPED RESET
+   :where() keeps specificity at zero, so a single class always wins.
+   ========================================================================== */
+
+.fc-root,
+.fc-root *,
+.fc-root *::before,
+.fc-root *::after { box-sizing: border-box; }
+
+.fc-root :where(h1, h2, h3, p, ul, ol, li, figure, fieldset) { margin: 0; padding: 0; }
+.fc-root :where(ul, ol) { list-style: none; }
+
+.fc-root :where(button) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fc-root :where(input) { font: inherit; color: inherit; }
+
+/* The browser's own [hidden] rule is a bare element selector, so any class
+   here that sets display would quietly beat it. The tab panels rely on this. */
+.fc-root [hidden] { display: none !important; }
+.fc-root :where(img, svg, picture) { display: block; max-width: 100%; }
+.fc-root :where(a) { color: inherit; }
+
+
+/* ==========================================================================
+   2. FONTS
+   Self-hosted. No request ever leaves this origin.
+
+   Roboto is ONE variable file per subset carrying both axes:
+     font-stretch: 75%  -> the condensed cut, used by the headline and the form
+     font-stretch: 100% -> the normal cut, used by the prize numbers on a card
+   Figma names these "Roboto Condensed Black Italic" and "Roboto Black Italic".
+   They are the same file at two widths.
+
+   DO NOT add font-variation-settings: "wdth" 75 anywhere. font-stretch already
+   sets that axis; writing both condenses the text twice.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-var-black-italic-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Roboto Flex";
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-var-black-italic-cyrillic.woff2") format("woff2");
+  /* Ukrainian і ї є ґ all live here. cyrillic-ext is not needed. */
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Inter Var";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/inter-var-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+                 U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter Var";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("../assets/fonts/inter-var-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* Metric-matched fallback so the swap does not move the headline.
+   Numbers are Roboto's own metrics against a 2048 upem. */
+@font-face {
+  font-family: "Roboto Fallback";
+  src: local("Arial Narrow"), local("Arial");
+  size-adjust: 100.06%;
+  ascent-override: 92.77%;
+  descent-override: 24.41%;
+  line-gap-override: 0%;
+}
+
+
+/* ==========================================================================
+   3. TOKENS
+   ========================================================================== */
+
+.fc-root {
+  /* Brand — the two colours defined as variables in Figma */
+  --fc-orange:      #ff4500;
+  --fc-navy:        #191970;
+
+  /* Sampled from the design */
+  --fc-gold:        #ffd900;
+  --fc-navy-deep:   #00002e;
+  --fc-navy-ink:    #171671;
+  --fc-muted:       #737b8c;
+  --fc-footer-txt:  #9ca3af;
+  --fc-border:      #e7e6e9;
+  --fc-field-bg:    #f3f4f5;
+  --fc-badge-bg:    rgb(25 25 112 / 0.2);
+  --fc-badge-brd:   #22223b;
+  --fc-check:       #43a047;
+  --fc-link:        #00a75c;
+  --fc-card-line:   #d9d9d9;
+  --fc-ink:         #2a2a2a;
+
+  /* Type */
+  --fc-display: "Roboto Flex", "Roboto Fallback", "Arial Narrow", Arial, sans-serif;
+  --fc-ui:      "Inter Var", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Elevation */
+  --fc-shadow-card:  0 calc(4 * var(--cu)) calc(12 * var(--cu)) rgb(0 0 0 / 0.5);
+  --fc-shadow-lift:  0 calc(18 * var(--cu)) calc(34 * var(--cu)) rgb(0 0 0 / 0.55);
+  --fc-shadow-plate: 0 3.657px 1.829px rgb(0 0 0 / 0.25);
+  --fc-shadow-modal: 0 12px 12px rgb(25 25 112 / 0.08);
+  --fc-shadow-cta:   0 4px 6px rgb(255 69 0 / 0.19);
+
+  /* The card front's radial fill.
+     Derived from Figma's gradientTransform
+       matrix(0.012501, 63.2, -47.4, 0.0093757, 151.87, 202.5), r=10
+     which is an ellipse of radii 474 x 632 centred on the 303.75 x 405 panel.
+     Converted here into the 272 x 381 card's own coordinates.
+     Only the first third of the ramp is on screen, which is why the card reads
+     bright blue. Do not pull the stops inward to "fix" that. */
+  --fc-card-fill: radial-gradient(174.26% 165.88% at 49.96% 46.85%,
+    #004ce5 0%, #003cc0 20%, #002c9b 40%, #00237b 55%,
+    #001a5c 70%, #00113c 85%, #00081c 100%);
+
+  /* Motion. Section 12 rewrites these under prefers-reduced-motion. */
+  --fc-flip-ms:     520ms;
+  --fc-flip-ease:   cubic-bezier(0.37, 0, 0.63, 1);   /* easeInOutSine */
+  --fc-hover-ms:    180ms;
+  --fc-settle-ms:   280ms;
+  --fc-recede-ms:   360ms;
+  --fc-modal-in:    320ms;
+  --fc-modal-out:   200ms;
+  --fc-scrim-ms:    280ms;
+  --fc-ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+
+/* ==========================================================================
+   4. SCALE
+
+   Two lengths carry the whole comp.
+
+     --u   one pixel of the artboard        (1920 x 1080 desktop, 375 x 666 mobile)
+     --cu  one pixel of the card's own art  (the card is authored at 272 x 381)
+
+   Every measurement below is a number copied straight out of Figma multiplied
+   by one of them, so no value is ever written twice for two breakpoints.
+
+   Why --cu exists: the card is drawn at 272 x 381 in Figma but placed at
+   176.435 x 246.908 on desktop and 83.235 x 116.482 on mobile. Those are the
+   same drawing at 0.648659 and 0.306012. The gaps confirm it: divide either
+   breakpoint's gap by its scale and you get 56.035 and 58.373 both times.
+
+   Do NOT shrink the card with transform: scale(). The flip needs rotateY on
+   that same element, and a scale on a preserve-3d ancestor flattens the
+   perspective. Scaling by length leaves transform free.
+   ========================================================================== */
+
+.fc-root {
+  --u:  min(calc(100vw / 375), calc(100svh / 666));
+  --cu: calc(0.306012 * var(--u));
+  --artboard-w: 375;
+  --artboard-h: 666;
+}
+
+@media (min-width: 900px) {
+  .fc-root {
+    --u:  min(calc(100vw / 1920), calc(100svh / 1080));
+    --cu: calc(0.648659 * var(--u));
+    --artboard-w: 1920;
+    --artboard-h: 1080;
+  }
+}
+
+
+/* ==========================================================================
+   5. LAYOUT
+   ========================================================================== */
+
+.fc-hero {
+  position: relative;
+  width: 100%;
+  height: calc(var(--artboard-h) * var(--u));
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The artwork always covers the full width, however wide the window is. */
+.fc-hero__bg,
+.fc-hero__bg img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.fc-hero__bg img {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* The content sits on a centred artboard so it keeps the composition of the
+   Figma frame no matter how wide the window gets. */
+.fc-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(var(--artboard-w) * var(--u));
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.fc-copy,
+.fc-game { position: absolute; }
+
+/* Mobile: stacked, from the 375 x 666 frame */
+.fc-copy { left: calc(17 * var(--u));  top: calc(17 * var(--u));  width: calc(340 * var(--u)); }
+.fc-game { left: calc(45 * var(--u));  top: calc(184 * var(--u)); width: calc(284 * var(--u)); }
+
+@media (min-width: 900px) {
+  /* Desktop: copy left, cards right, from the 1920 x 1080 frame */
+  .fc-copy { left: calc(152 * var(--u));  top: calc(347 * var(--u));  width: calc(875.188 * var(--u)); }
+  .fc-game { left: calc(1173 * var(--u)); top: calc(124 * var(--u));  width: calc(602 * var(--u)); }
+}
+
+
+/* ==========================================================================
+   6. BRAND
+   ========================================================================== */
+
+.fc-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(24 * var(--u));
+}
+
+@media (min-width: 900px) {
+  .fc-copy { gap: calc(64 * var(--u)); }
+}
+
+.fc-plate {
+  display: flex;
+  background: #fff;
+  border-radius: calc(5.254 * var(--u));
+  padding: calc(4.378 * var(--u)) calc(10.508 * var(--u));
+  box-shadow: 0 calc(1.751 * var(--u)) calc(0.876 * var(--u)) rgb(0 0 0 / 0.25);
+}
+
+.fc-plate img {
+  width: calc(121.984 * var(--u));
+  height: calc(21.891 * var(--u));
+}
+
+@media (min-width: 900px) {
+  .fc-plate {
+    border-radius: calc(10.971 * var(--u));
+    padding: calc(9.143 * var(--u)) calc(21.943 * var(--u));
+    box-shadow: 0 calc(3.657 * var(--u)) calc(1.829 * var(--u)) rgb(0 0 0 / 0.25);
+  }
+  .fc-plate img { width: calc(254.733 * var(--u)); height: calc(45.714 * var(--u)); }
+}
+
+.fc-headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6.216 * var(--u));
+  width: 100%;
+  font-family: var(--fc-display);
+  font-weight: 900;
+  font-style: italic;
+  font-stretch: 75%;          /* the condensed cut */
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.05;
+  font-synthesis: none;
+}
+
+.fc-headline__a { font-size: calc(30 * var(--u)); color: #fff; }
+.fc-headline__b { font-size: calc(38 * var(--u)); color: var(--fc-gold); }
+
+@media (min-width: 900px) {
+  .fc-headline { gap: calc(16 * var(--u)); }
+  .fc-headline__a { font-size: calc(80 * var(--u)); }
+  .fc-headline__b { font-size: calc(100 * var(--u)); white-space: nowrap; }
+}
+
+
+/* ==========================================================================
+   7. GRID
+   Widths and gaps are in card units, so one set of numbers serves both
+   breakpoints. 3 x 272 + 2 x 56.035 = 928.07, which is exactly the 602px
+   desktop frame and the 284px mobile frame once scaled.
+   ========================================================================== */
+
+.fc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, calc(272 * var(--cu)));
+  grid-template-rows: repeat(3, calc(381 * var(--cu)));
+  column-gap: calc(56.035 * var(--cu));
+  row-gap: calc(58.373 * var(--cu));
+  justify-content: center;
+}
+
+.fc-cell {
+  position: relative;
+  width: calc(272 * var(--cu));
+  height: calc(381 * var(--cu));
+}
+
+/* Shadow plates.
+   The card's shadow must NOT live on the rotating element. As a CSS filter it
+   would flatten the 3D context and kill the flip; as a box-shadow on the
+   rotating node it would swing around with the card, as if the light source
+   were orbiting. So it lives on two pseudo-elements of the still cell, and the
+   hover change is an opacity crossfade between them — compositor only, no
+   repaint. An outer box-shadow paints outside the border box, so a plate with
+   no background still casts, with the card sitting over the hole. */
+.fc-cell::before,
+.fc-cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: calc(44 * var(--cu));
+  pointer-events: none;
+  transition: opacity var(--fc-hover-ms) var(--fc-ease-out);
+}
+
+.fc-cell::before { box-shadow: var(--fc-shadow-card); opacity: 1; }
+.fc-cell::after  { box-shadow: var(--fc-shadow-lift); opacity: 0;
+                   transform: translateY(calc(3 * var(--cu))); }
+
+/* The dip while the card turns edge-on. Values already sample |cos t| at the
+   eased angle, so the keyframe itself is linear — easing it as well would
+   double-count. A card flips once and then locks, so a one-shot keyframe is
+   the right tool here rather than a transition. */
+.fc-cell[data-flipping]::before { animation: fc-shadow-dip var(--fc-flip-ms) linear; }
+.fc-cell[data-flipping]::after  { opacity: 0; }
+
+@keyframes fc-shadow-dip {
+  0%, 100% { transform: scaleX(1);    opacity: 1;   }
+  25%, 75% { transform: scaleX(.895); opacity: .92; }
+  50%      { transform: scaleX(.06);  opacity: .30; }
+}
+
+
+/* ==========================================================================
+   8. CARD
+
+   Three levels, and they never share a job:
+     .fc-cell   layout box and shadow, never moves
+     .fc-card   perspective host, hit target, focus ring, all 2D transforms
+     .fc-flip   preserve-3d, and its transform is rotateY and nothing else
+   ========================================================================== */
+
+.fc-card {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(44 * var(--cu));
+  /* Perspective in card units, so the same depth reads at both sizes. A fixed
+     1000px would give 24% near/far on desktop and 5% on the 83px mobile card,
+     which is two different interactions rather than one. */
+  perspective: calc(900 * var(--cu));
+  transition: transform var(--fc-hover-ms) var(--fc-ease-out);
+}
+
+.fc-flip {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--fc-flip-ms) var(--fc-flip-ease);
+}
+
+.fc-cell[data-face="front"] .fc-flip { transform: rotateY(180deg); }
+
+.fc-face {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(44 * var(--cu));
+  overflow: hidden;           /* on the FACE. Never on .fc-flip: overflow forces
+                                 transform-style back to flat and the rotation
+                                 collapses into a horizontal squash. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* The half-unit of separation stops the two coplanar faces z-fighting near
+   90 degrees, and gives older WebKit the composited layer it needs before it
+   will honour backface-visibility at all. */
+.fc-face--back  { transform: translateZ(calc(0.5 * var(--cu))); }
+.fc-face--front { transform: rotateY(180deg) translateZ(calc(0.5 * var(--cu))); }
+
+/* --- back ---------------------------------------------------------------- */
+
+.fc-face--back {
+  background-color: #0b1f6b;
+  background-image: url("../assets/img/card-back-art.svg"),
+                    url("../assets/img/card-back.webp");
+  background-repeat: no-repeat, no-repeat;
+  background-position: center, center;
+  /* Both layers are explicitly placed, exactly as in Figma. The photo sits in
+     a 365 x 488 box that overflows the 272 x 381 card; "cover" would be 28%
+     less zoomed and would not match the design. The 2px blur is baked into
+     the file, not applied here — nine CSS blur layers would re-render every
+     frame, and Safari leaks square corners through a rounded clip when a
+     blurred child is involved. */
+  background-size: calc(148.412 * var(--cu)) calc(98.941 * var(--cu)),
+                   calc(365 * var(--cu)) calc(488 * var(--cu));
+}
+
+/* --- front --------------------------------------------------------------- */
+
+.fc-face--front {
+  background-color: #00081c;
+  background-image: var(--fc-card-fill);
+  /* Figma's 0.675px panel border falls outside the card's clip on three sides.
+     Only the bottom edge survives, as a hairline of white at 10%. */
+  box-shadow: inset 0 calc(-0.675 * var(--cu)) 0 rgb(255 255 255 / 0.1);
+}
+
+/* Figma also puts a 32.4px blur shadow on that panel. It is not reproduced,
+   and that is deliberate: the panel overhangs the card's clip on every side,
+   so an outer shadow paints entirely outside the mask and renders nothing.
+   Nine large-blur shadows drawn and immediately discarded.
+
+   The "diagonal-split-glow" and "shaded-sphere" layers are skipped for the
+   same reason. Both sit above the card's top edge inside the clipped
+   container. Confirmed against the Figma render of node 12:287, which shows a
+   plain gradient with an outline and no decoration. The exported SVGs are
+   kept in raw/img/ in case that ever changes. */
+
+.fc-face--front::before {
+  content: "";
+  position: absolute;
+  left: calc(17 * var(--cu));
+  top: calc(16 * var(--cu));
+  width: calc(237 * var(--cu));
+  height: calc(349 * var(--cu));
+  border: max(1px, calc(4 * var(--cu))) solid var(--fc-card-line);
+  border-radius: calc(44 * var(--cu));
+  /* max(1px, ...) keeps the outline from washing out: at mobile scale 4 card
+     units is 1.22px, which antialiases to grey on a 1x screen. */
+}
+
+.fc-prize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(105 * var(--cu));
+  height: calc(148 * var(--cu));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-family: var(--fc-display);
+  font-weight: 900;
+  font-style: italic;
+  font-stretch: 100%;         /* the prize numbers are NOT condensed */
+  text-transform: uppercase;
+  text-align: center;
+  color: #fff;
+  /* Absolute, not unitless: the three lines have three different font sizes
+     and the design gives them one shared leading. The 71.58 cap height
+     overflows this line box on purpose, so never clip this element. */
+  line-height: calc(47.243 * var(--cu));
+  font-synthesis: none;
+}
+
+.fc-prize__pct  { font-size: calc(71.581 * var(--cu)); }
+.fc-prize__plus { font-size: calc(44 * var(--cu)); }
+.fc-prize__fs   { font-size: calc(53.686 * var(--cu)); }
+
+/* --- states -------------------------------------------------------------- */
+
+@media (hover: hover) and (pointer: fine) {
+  .fc-cell[data-face="back"] .fc-card:hover {
+    transform: translateY(calc(-9 * var(--cu)));
+  }
+  .fc-cell[data-face="back"]:hover::before { opacity: 0; }
+  .fc-cell[data-face="back"]:hover::after  { opacity: 1; }
+}
+
+.fc-card:active { transform: scale(0.975); transition-duration: 100ms; }
+
+.fc-card:focus-visible {
+  outline: max(2px, calc(3 * var(--cu))) solid var(--fc-gold);
+  outline-offset: max(2px, calc(4 * var(--cu)));
+}
+
+.fc-cell[data-face="front"] .fc-card { cursor: default; }
+
+/* The winner ring. It marks, it does not celebrate: the visitor has to be able
+   to count to three, so it is static. A looping pulse would pull the eye back
+   to a card that is already decided. */
+.fc-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 calc(3 * var(--cu)) var(--fc-gold),
+              0 0 calc(36 * var(--cu)) calc(6 * var(--cu)) rgb(255 217 0 / 0.45);
+  opacity: 0;
+  transition: opacity var(--fc-settle-ms) var(--fc-ease-out),
+              box-shadow var(--fc-settle-ms) var(--fc-ease-out);
+}
+
+.fc-cell[data-win][data-face="front"] .fc-card::after { opacity: 1; }
+
+.fc-cell[data-win][data-face="front"] .fc-card {
+  animation: fc-settle var(--fc-settle-ms) var(--fc-ease-out) 460ms both;
+}
+
+@keyframes fc-settle {
+  0%   { transform: scale(1); }
+  42%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* The win moment: the three winners brighten left to right, the other six
+   step back. Opacity and transform only — animating a blur on six elements at
+   the busiest moment on the page is the one thing guaranteed to stutter. */
+.fc-grid[data-phase="reveal"] [data-win] .fc-card::after {
+  box-shadow: 0 0 0 calc(3 * var(--cu)) var(--fc-gold),
+              0 0 calc(56 * var(--cu)) calc(10 * var(--cu)) rgb(255 217 0 / 0.75);
+  transition-delay: calc(var(--i) * 80ms);
+}
+
+.fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) {
+  opacity: 0.35;
+  transform: scale(0.97);
+}
+
+.fc-grid .fc-cell {
+  transition: opacity var(--fc-recede-ms) var(--fc-ease-out),
+              transform var(--fc-recede-ms) var(--fc-ease-out);
+}
+
+/* Progress pips */
+.fc-progress {
+  display: flex;
+  justify-content: center;
+  gap: calc(10 * var(--u));
+  margin-top: calc(14 * var(--u));
+}
+
+.fc-pip {
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.22);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3);
+  transform: scale(0.6);
+  opacity: 0.55;
+  transition: transform 200ms var(--fc-ease-out),
+              opacity 200ms var(--fc-ease-out),
+              background 200ms var(--fc-ease-out);
+}
+
+.fc-pip[data-on] {
+  background: var(--fc-gold);
+  box-shadow: 0 0 calc(10 * var(--u)) rgb(255 217 0 / 0.6);
+  transform: scale(1);
+  opacity: 1;
+}
+
+
+/* ==========================================================================
+   9. FOOTER
+   Real pixels, not artboard units: this is reading text, and it must respond
+   to the browser's own zoom and font-size settings.
+   ========================================================================== */
+
+.fc-footer {
+  background: var(--fc-navy-deep);
+  color: var(--fc-footer-txt);
+  font-family: var(--fc-ui);
+  padding: 32px 20px 28px;
+}
+
+.fc-footer__in {
+  max-width: 1680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.fc-footer__top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.fc-fgroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.fc-flabel {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.fc-frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+.fc-social {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: var(--fc-badge-bg);
+  border: 1px solid var(--fc-badge-brd);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.fc-social:hover { border-color: #3a3a63; background: rgb(25 25 112 / 0.38); }
+.fc-social img { width: 20px; height: 20px; }
+
+.fc-pay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--fc-badge-bg);
+  border: 1px solid var(--fc-badge-brd);
+}
+
+.fc-pay img { height: 24px; width: auto; }
+
+.fc-divider { height: 1px; background: rgb(156 163 175 / 0.16); }
+
+.fc-footer__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.fc-footer__logo {
+  display: flex;
+  width: 110px;
+  height: 24px;
+  padding: 3.429px 8.229px;
+  background: #fff;
+  border-radius: 4.114px;
+  box-shadow: 0 1.371px 0.686px rgb(0 0 0 / 0.25);
+}
+
+.fc-footer__logo img { width: 95.525px; height: 17.143px; }
+
+@media (min-width: 900px) {
+  .fc-footer { padding: 48px 120px 40px; }
+  .fc-footer__in { gap: 40px; }
+  .fc-footer__top { flex-direction: row; justify-content: space-between; align-items: center; }
+  .fc-fgroup { align-items: flex-start; }
+  .fc-fgroup--end { align-items: flex-end; }
+  .fc-footer__bottom { flex-direction: row; justify-content: space-between; }
+}
+
+
+/* ==========================================================================
+   10. MODAL + FORM
+   Fixed pixels throughout. Viewport units here would break browser zoom, and
+   any input below 16px makes iOS Safari zoom the page on focus.
+   ========================================================================== */
+
+.fc-modal {
+  width: min(504px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100svh - 32px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+  transform-origin: center;
+  transition:
+    opacity   var(--fc-modal-in) var(--fc-ease-out) 60ms,
+    transform var(--fc-modal-in) var(--fc-ease-out) 60ms,
+    overlay   var(--fc-modal-in) allow-discrete,
+    display   var(--fc-modal-in) allow-discrete;
+}
+
+.fc-modal[open] { opacity: 1; transform: scale(1) translateY(0); }
+
+@starting-style {
+  .fc-modal[open] { opacity: 0; transform: scale(0.96) translateY(8px); }
+}
+
+/* The 60ms lead on the panel means the room dims first, then the thing
+   arrives. One property, and it is the whole difference between a modal
+   appearing and a modal being presented. */
+.fc-modal::backdrop {
+  background: rgb(0 0 30 / 0.72);
+  -webkit-backdrop-filter: blur(10px) saturate(115%);
+  backdrop-filter: blur(10px) saturate(115%);
+  opacity: 0;
+  transition: opacity var(--fc-scrim-ms) var(--fc-ease-out),
+              overlay var(--fc-scrim-ms) allow-discrete,
+              display var(--fc-scrim-ms) allow-discrete;
+}
+
+.fc-modal[open]::backdrop { opacity: 1; }
+
+@starting-style {
+  .fc-modal[open]::backdrop { opacity: 0; }
+}
+
+/* Leaving is faster than arriving, and the scrim goes last. The user has
+   already decided; a slow exit reads as an obstacle. */
+.fc-modal:not([open]) {
+  transition-duration: var(--fc-modal-out);
+  transition-delay: 0ms;
+  transform: scale(0.98);
+}
+
+.fc-modal:not([open])::backdrop { transition-delay: 40ms; }
+
+.fc-form {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 20px;
+  background: #fff;
+  border: 1px solid var(--fc-border);
+  border-radius: 24px;
+  box-shadow: var(--fc-shadow-modal);
+  font-family: var(--fc-ui);
+  max-height: calc(100svh - 32px);
+  overflow-y: auto;
+}
+
+@media (min-width: 480px) { .fc-form { padding: 36px; } }
+
+.fc-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--fc-muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.fc-close:hover { background: var(--fc-field-bg); color: var(--fc-navy); }
+.fc-close:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
+
+.fc-form__logo { width: 200px; height: 36px; }
+@media (min-width: 480px) { .fc-form__logo { width: 247px; height: 44px; } }
+
+.fc-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: center;
+  font-family: var(--fc-display);
+  font-weight: 900;
+  font-style: italic;
+  font-stretch: 75%;
+  text-transform: uppercase;
+  font-synthesis: none;
+}
+
+.fc-offer__title { font-size: 26px; line-height: 1.2; color: var(--fc-navy); }
+.fc-offer__row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.fc-offer__pct  { font-size: 76px; line-height: 1; color: var(--fc-orange); }
+.fc-offer__side { display: flex; flex-direction: column; align-items: flex-start; color: var(--fc-navy-ink); }
+.fc-offer__num  { font-size: 46px; line-height: 1.05; }
+.fc-offer__spins { font-size: 18px; line-height: 1.1; }
+
+@media (min-width: 480px) {
+  .fc-offer__title { font-size: 34px; line-height: 48px; }
+  .fc-offer__row   { gap: 20.05px; }
+  .fc-offer__pct   { font-size: 130px; }
+  .fc-offer__num   { font-size: 77px; line-height: 71.287px; }
+  .fc-offer__spins { font-size: 28px; }
+}
+
+/* --- tabs ---------------------------------------------------------------- */
+
+.fc-tabs {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  border-bottom: 1px solid var(--fc-border);
+}
+
+.fc-tab {
+  position: relative;
+  padding-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--fc-muted);
+}
+
+.fc-tab[aria-selected="true"] { color: var(--fc-navy); }
+
+.fc-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--fc-navy);
+}
+
+.fc-tab:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 3px; }
+
+/* --- fields -------------------------------------------------------------- */
+
+.fc-fields { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+.fc-field  { display: flex; flex-direction: column; gap: 6px; }
+
+.fc-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fc-muted);
+}
+
+.fc-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 12px 16px;
+  background: var(--fc-field-bg);
+  border: 1.5px solid var(--fc-border);
+  border-radius: 10px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.fc-input:focus-within { border-color: var(--fc-navy); background: #fff; }
+
+.fc-input__flag { font-size: 18px; line-height: 1; }
+.fc-input__dial { font-size: 15px; font-weight: 500; color: var(--fc-ink); }
+
+.fc-input input {
+  flex: 1 0 0;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  font-size: 16px;          /* never below 16 — iOS zooms the page otherwise */
+  font-weight: 500;
+  color: var(--fc-ink);
+}
+
+.fc-input input::placeholder { color: var(--fc-muted); font-weight: 500; }
+
+.fc-eye {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border-radius: 8px;
+  opacity: 0.7;
+}
+
+.fc-eye:hover { opacity: 1; }
+.fc-eye:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
+.fc-eye img { width: 20px; height: 20px; }
+.fc-eye[aria-pressed="true"] { opacity: 1; }
+
+.fc-field[data-invalid] .fc-input { border-color: var(--fc-orange); background: #fff5f2; }
+
+.fc-error {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fc-orange);
+  min-height: 0;
+}
+
+.fc-field:not([data-invalid]) .fc-error,
+.fc-error:empty { display: none; }
+
+/* The consent error sits outside a .fc-field, so it gets its own alignment. */
+.fc-error--consent { width: 100%; margin-top: -16px; padding-left: 32px; }
+
+/* --- consent ------------------------------------------------------------- */
+
+.fc-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--fc-muted);
+}
+
+.fc-consent input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fc-consent__box {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1.5px solid var(--fc-border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.fc-consent__box img { width: 10px; height: 10px; opacity: 0; transition: opacity 120ms ease; }
+
+.fc-consent input:checked + .fc-consent__box {
+  background: var(--fc-check);
+  border-color: var(--fc-check);
+}
+
+.fc-consent input:checked + .fc-consent__box img { opacity: 1; }
+
+.fc-consent input:focus-visible + .fc-consent__box {
+  outline: 2px solid var(--fc-navy);
+  outline-offset: 2px;
+}
+
+.fc-consent[data-invalid] .fc-consent__box { border-color: var(--fc-orange); }
+.fc-consent a { color: var(--fc-link); font-weight: 600; text-decoration: none; }
+.fc-consent a:hover { text-decoration: underline; }
+
+/* --- submit -------------------------------------------------------------- */
+
+.fc-actions { display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%; }
+
+.fc-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  padding: 12px 24px;
+  background: var(--fc-orange);
+  border-radius: 10px;
+  box-shadow: var(--fc-shadow-cta);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+  text-transform: uppercase;
+  transition: filter 140ms ease, transform 120ms var(--fc-ease-out);
+}
+
+.fc-submit:hover { filter: brightness(1.07); }
+.fc-submit:active { transform: scale(0.985); }
+.fc-submit:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 3px; }
+
+.fc-signin { font-size: 14px; font-weight: 500; color: var(--fc-muted); }
+.fc-signin a { color: var(--fc-orange); font-weight: 700; text-decoration: none; }
+.fc-signin a:hover { text-decoration: underline; }
+
+/* The standing claim button under the grid. It exists so that dismissing the
+   modal does not lose the offer — a promo page that throws away the CTA on
+   Escape is a conversion bug. */
+.fc-claim {
+  display: none;
+  margin: calc(18 * var(--u)) auto 0;
+  padding: calc(11 * var(--u)) calc(22 * var(--u));
+  background: var(--fc-orange);
+  border-radius: calc(10 * var(--u));
+  box-shadow: var(--fc-shadow-cta);
+  color: #fff;
+  font-family: var(--fc-ui);
+  font-size: calc(14 * var(--u));
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: filter 140ms ease, transform 120ms var(--fc-ease-out);
+}
+
+.fc-claim[data-on] { display: block; }
+.fc-claim:hover { filter: brightness(1.07); }
+.fc-claim:active { transform: scale(0.985); }
+.fc-claim:focus-visible { outline: 2px solid var(--fc-gold); outline-offset: 3px; }
+
+
+/* ==========================================================================
+   11. UTILITIES
+   ========================================================================== */
+
+.fc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fc-noscroll { overflow: hidden; }
+
+
+/* ==========================================================================
+   12. REDUCED MOTION
+   Not a kill switch. Each animation degrades to its gentlest meaningful form.
+   An instant face swap would lose the link between the click and the result,
+   so the flip becomes a crossfade instead of disappearing.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-root {
+    --fc-flip-ms:   220ms;
+    --fc-hover-ms:  120ms;
+    --fc-modal-in:  200ms;
+    --fc-modal-out: 150ms;
+    --fc-scrim-ms:  200ms;
+  }
+
+  .fc-flip { transform: none !important; transform-style: flat; }
+
+  .fc-face {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    transition: opacity var(--fc-flip-ms) ease;
+  }
+
+  /* Without this the front face keeps its rotateY(180deg) and every prize
+     renders as mirrored text. */
+  .fc-face--front { transform: none !important; opacity: 0; }
+  .fc-face--back  { transform: none !important; opacity: 1; }
+
+  .fc-cell[data-face="front"] .fc-face--front { opacity: 1; }
+  .fc-cell[data-face="front"] .fc-face--back  { opacity: 0; }
+
+  .fc-cell::before,
+  .fc-cell::after { animation: none !important; }
+
+  .fc-cell[data-win][data-face="front"] .fc-card { animation: none; }
+
+  .fc-grid[data-phase="reveal"] [data-win] .fc-card::after { transition-delay: 0ms; }
+  .fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) { transform: none; }
+
+  /* Face-down cards need a static affordance once the lift is gone. */
+  .fc-cell[data-face="back"] .fc-face--back {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .fc-cell[data-face="back"] .fc-card:hover { transform: none; }
+  }
+
+  /* The press stays. It is four pixels, caused by the user's own finger, and
+     removing it makes the page feel broken. */
+
+  .fc-modal { transform: none !important; }
+  @starting-style { .fc-modal[open] { transform: none; } }
+  .fc-pip { transform: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .fc-modal::backdrop {
+    background: rgb(0 0 30 / 0.95);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) { opacity: 0.6; }
+  .fc-card::after { box-shadow: 0 0 0 calc(4 * var(--cu)) var(--fc-gold); }
+  .fc-consent, .fc-field__label, .fc-footer { color: #d5d9e0; }
+}
