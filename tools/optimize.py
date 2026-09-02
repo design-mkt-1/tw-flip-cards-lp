@@ -40,6 +40,7 @@ SVG_PASSTHROUGH = {
     "logo-topwin.svg": OUT,
     "card-back-art.svg": OUT,
     "icon-eye.svg": ICONS,
+    "flag-ua.svg": ICONS,
     "icon-check.svg": ICONS,
     "social-telegram.svg": ICONS,
     "social-youtube.svg": ICONS,
@@ -51,6 +52,11 @@ SVG_PASSTHROUGH = {
     "pay-tether.svg": ICONS,
     "pay-bitcoin.svg": ICONS,
 }
+
+# Two entries above are not plain Figma exports. flag-ua.svg is not an export
+# at all: it stands in for the emoji Windows cannot draw. icon-eye.svg is an
+# export plus the pupil, which the exporter drops. Both are explained in the
+# README, section 7.
 
 # raw/img/card-glow.svg and raw/img/card-sphere.svg are deliberately NOT
 # copied. Both sit above the card's top edge inside a clipped container, so
@@ -106,6 +112,14 @@ def build_hero() -> None:
 def build_card_back() -> None:
     """
     The design blurs this photo by 2px behind a 365x488 frame.
+
+    Do not "fix" the softness by dropping the blur. Figma's render of the
+    symbol on its own (node 12:283) IS sharp, because the blur lives above it
+    and is not part of an isolated node render -- but the composed 1920 frame
+    (12:320) shows it. Fitting a Gaussian to that frame lands on 2.0 in the
+    365px frame's units, which is what the line below reproduces: sweeping the
+    radius against the crop inside card 1 bottoms out at 1.3px on screen
+    (mean 3.45 against 4.81 unblurred and 5.24 at twice the radius).
 
     The blur is baked in here rather than done with a CSS filter. A CSS filter
     on an element that is rotated in 3D, nine times over, forces a filter pass

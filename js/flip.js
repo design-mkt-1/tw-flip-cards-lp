@@ -47,9 +47,12 @@
     privacyUrl: '',
     loginUrl:   '',
 
-    /* The phone country. Change all three together. */
+    /* The phone country. Change all three together.
+       dialFlag takes either an emoji or a path to an 18x18 image. It ships as
+       an image because Windows has no flag glyphs at all: Segoe UI Emoji
+       renders 🇺🇦 as the bare letters "UA". */
     dialCode:    '+380',
-    dialFlag:    '🇺🇦',
+    dialFlag:    'assets/img/icons/flag-ua.svg',
     phoneDigits: 9,          // digits expected after the dial code
 
     /* IT INTEGRATION — END
@@ -553,7 +556,19 @@
   function applyDialCode() {
     var flag = $('.fc-input__flag');
     var dial = $('.fc-input__dial');
-    if (flag) flag.textContent = CONFIG.dialFlag;
+    if (flag) {
+      if (/\.(svg|png|webp|avif|gif|jpe?g)$/i.test(CONFIG.dialFlag)) {
+        var img = document.createElement('img');
+        img.src = CONFIG.dialFlag;
+        img.width = 18;
+        img.height = 18;
+        img.alt = '';
+        flag.textContent = '';
+        flag.appendChild(img);
+      } else {
+        flag.textContent = CONFIG.dialFlag;
+      }
+    }
     if (dial) dial.textContent = CONFIG.dialCode;
   }
 

@@ -38,6 +38,11 @@ Everything in rows 1 to 3 sits inside one commented block at the top of
 | 5 | Social profile links          | the five `<a class="fc-social" href="#">` in each HTML file            |
 | 6 | Logo click target             | wrap `.fc-plate img` in an `<a>` in each HTML file                     |
 
+`CONFIG.dialFlag` takes either an emoji or a path to an 18 x 18 image, and
+ships as `assets/img/icons/flag-ua.svg`. Windows has no flag glyphs at all —
+Segoe UI Emoji renders 🇺🇦 as the bare letters "UA" — so the emoji the Figma
+file uses cannot be shipped as text.
+
 Marketing can change the prizes and the odds in `CONFIG.deck`, `winPrizeId`
 and `winTarget`, also at the top of `js/flip.js`.
 
@@ -155,7 +160,7 @@ are in the `MESSAGES` table at the top of `js/flip.js`, keyed by language.
 
 ## 7. Assets
 
-`raw/` holds the untouched Figma exports and `tools/optimize.py` turns them
+`raw/` holds the Figma exports and `tools/optimize.py` turns them
 into `assets/img/`. Neither is served; the Pages workflow copies only the
 files a browser requests. Re-run the script by hand if the raw exports change:
 
@@ -171,6 +176,15 @@ python tools/optimize.py
 | Card back        | WebP, blur baked in     | 6 KB   |
 | Icons and logo   | SVG                     | ~20 KB |
 | Fonts            | 4 WOFF2 subsets         | 117 KB |
+
+Two icons are not straight Figma exports:
+
+- `flag-ua.svg` is not an export at all. It is the stand-in for the 🇺🇦
+  emoji. See row 4 of section 1.
+- `icon-eye.svg` is an export **plus one shape**. Figma's export of node
+  12:523 carries only the almond; the pupil is a second circle that the
+  exporter drops. It is restored by hand in `raw/img/icon-eye.svg`, and a
+  fresh export will lose it again.
 
 Two things worth knowing about the assets:
 
@@ -208,8 +222,8 @@ These are load-bearing. Please keep them when you integrate.
 
 ## 9. Two questions for the design team
 
-1. The phone prefix stays `🇺🇦 +380` in the Russian and English versions too.
-   That is how the Figma file is drawn. If this campaign is not
+1. The phone prefix stays Ukrainian, `+380`, in the Russian and English
+   versions too. That is how the Figma file is drawn. If this campaign is not
    Ukraine-only, change `CONFIG.dialCode`, `dialFlag` and `phoneDigits`.
 2. Figma styles the two consent links green only in the Ukrainian version, and
    sets the copyright line in bold only in the Russian one. Both were

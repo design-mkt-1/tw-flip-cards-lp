@@ -163,7 +163,12 @@ body {
   --fc-card-line:   #d9d9d9;
   --fc-ink:         #2a2a2a;
 
-  /* Type */
+  /* Type.
+     --fc-auto-lh is Figma's "Auto" leading for Roboto: (ascender 1900 +
+     descender 500) / 2048 em. CSS `normal` is NOT the same number — Chrome
+     adds Roboto Flex's line gap on top and lands on 1.1975, which is 2px of
+     drift per line at the display sizes used here. */
+  --fc-auto-lh: 1.171875;
   --fc-display: "Roboto Flex", "Roboto Fallback", "Arial Narrow", Arial, sans-serif;
   --fc-ui:      "Inter Var", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -336,7 +341,8 @@ body {
   font-stretch: 75%;          /* the condensed cut */
   text-transform: uppercase;
   text-align: center;
-  line-height: 1.05;
+  /* Figma sets both lines to Auto leading (nodes 12:337 / 12:338). */
+  line-height: var(--fc-auto-lh);
   font-synthesis: none;
 }
 
@@ -644,7 +650,7 @@ body {
   background: var(--fc-navy-deep);
   color: var(--fc-footer-txt);
   font-family: var(--fc-ui);
-  padding: 32px 20px 28px;
+  padding: 40px 24px 32px;
 }
 
 .fc-footer__in {
@@ -652,25 +658,25 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 32px;
 }
 
 .fc-footer__top {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 32px;
 }
 
 .fc-fgroup {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .fc-flabel {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.01em;
@@ -698,7 +704,9 @@ body {
   align-items: center;
   justify-content: center;
   height: 36px;
-  padding: 6px 10px;
+  /* 9 + 1px border = the 10 Figma insets its 74x24 logo by, so the badge comes
+     out at exactly 94 x 36 instead of 96 x 36. */
+  padding: 5px 9px;
   border-radius: 8px;
   background: var(--fc-badge-bg);
   border: 1px solid var(--fc-badge-brd);
@@ -713,11 +721,15 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  font-size: 14px;
+  /* Figma's divider is a zero-height line; ours is a real pixel, so pull the
+     row back over it and the footer lands on 313 / 265 rather than 314 / 266. */
+  margin-top: -1px;
+  font-size: 12px;
 }
 
+/* Figma's mobile footer (12:2182) is copyright only — no logo. */
 .fc-footer__logo {
-  display: flex;
+  display: none;
   width: 110px;
   height: 24px;
   padding: 3.429px 8.229px;
@@ -726,15 +738,19 @@ body {
   box-shadow: 0 1.371px 0.686px rgb(0 0 0 / 0.25);
 }
 
-.fc-footer__logo img { width: 95.525px; height: 17.143px; }
+/* max-width: none, or the scoped reset's max-width:100% clamps the logo to
+   the 93.5px inside the plate's padding. Figma lets it overhang. */
+.fc-footer__logo img { flex: none; max-width: none; width: 95.525px; height: 17.143px; }
 
 @media (min-width: 900px) {
   .fc-footer { padding: 48px 120px 40px; }
   .fc-footer__in { gap: 40px; }
-  .fc-footer__top { flex-direction: row; justify-content: space-between; align-items: center; }
-  .fc-fgroup { align-items: flex-start; }
+  .fc-footer__top { flex-direction: row; justify-content: space-between; align-items: center; gap: 24px; }
+  .fc-fgroup { align-items: flex-start; gap: 16px; }
   .fc-fgroup--end { align-items: flex-end; }
-  .fc-footer__bottom { flex-direction: row; justify-content: space-between; }
+  .fc-flabel { font-size: 14px; }
+  .fc-footer__bottom { flex-direction: row; justify-content: space-between; font-size: 14px; }
+  .fc-footer__logo { display: flex; }
 }
 
 
@@ -745,7 +761,9 @@ body {
    ========================================================================== */
 
 .fc-modal {
-  width: min(504px, calc(100vw - 32px));
+  /* 504 on desktop; on mobile Figma sits the card at x=7 in the 375 frame,
+     so 360 wide, not 343. */
+  width: min(504px, calc(100vw - 15px));
   max-width: none;
   max-height: calc(100svh - 32px);
   padding: 0;
@@ -803,9 +821,10 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  padding: 28px 20px;
+  /* Figma's card (12:495 / 12:629) has no stroke, and content sits 24 from the
+     edge on mobile, 36 on desktop. A border would push both in by one more. */
+  padding: 24px;
   background: #fff;
-  border: 1px solid var(--fc-border);
   border-radius: 24px;
   box-shadow: var(--fc-shadow-modal);
   font-family: var(--fc-ui);
@@ -833,13 +852,18 @@ body {
 .fc-close:hover { background: var(--fc-field-bg); color: var(--fc-navy); }
 .fc-close:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
 
-.fc-form__logo { width: 200px; height: 36px; }
+.fc-form__logo { width: 156px; height: 28px; }
 @media (min-width: 480px) { .fc-form__logo { width: 247px; height: 44px; } }
 
 .fc-offer {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* Figma stacks the two lines flush on mobile (12:632) and 8 apart on
+     desktop (12:498). The negative top margin is the other mobile-only
+     difference: the logo sits 16 above this block there, 24 on desktop, and
+     the form's own gap is 24. */
+  gap: 0;
+  margin-top: -8px;
   width: 100%;
   text-align: center;
   font-family: var(--fc-display);
@@ -850,24 +874,41 @@ body {
   font-synthesis: none;
 }
 
-.fc-offer__title { font-size: 26px; line-height: 1.2; color: var(--fc-navy); }
+.fc-offer__title { font-size: 24px; line-height: 34.09px; color: var(--fc-navy); }
 .fc-offer__row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 0;
 }
-.fc-offer__pct  { font-size: 76px; line-height: 1; color: var(--fc-orange); }
-.fc-offer__side { display: flex; flex-direction: column; align-items: flex-start; color: var(--fc-navy-ink); }
-.fc-offer__num  { font-size: 46px; line-height: 1.05; }
-.fc-offer__spins { font-size: 18px; line-height: 1.1; }
+.fc-offer__pct  {
+  font-size: 74px;
+  line-height: var(--fc-auto-lh);
+  white-space: nowrap;
+  color: var(--fc-orange);
+}
+.fc-offer__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 107.585px;
+  color: var(--fc-navy-ink);
+}
+.fc-offer__num   { display: block; width: 100%; font-size: 54px; line-height: 50.628px; }
+.fc-offer__spins { display: block; width: 100%; font-size: 22px; line-height: var(--fc-auto-lh); }
 
 @media (min-width: 480px) {
+  /* The offer block is wider than the fields under it: Figma insets it 24.6
+     against 36 for everything else, and the row needs all 450px of that. */
+  .fc-offer        { gap: 8px; width: calc(100% + 22.8px); margin: 0 -11.4px; }
   .fc-offer__title { font-size: 34px; line-height: 48px; }
   .fc-offer__row   { gap: 20.05px; }
-  .fc-offer__pct   { font-size: 130px; }
+  /* 130px type in a 99.134px box, exactly as Figma draws it (12:501). A taller
+     line box is what pushed the whole form 25px long. */
+  .fc-offer__pct   { font-size: 130px; line-height: 99.134px; width: 278.465px; }
+  .fc-offer__side  { width: 151.485px; }
   .fc-offer__num   { font-size: 77px; line-height: 71.287px; }
-  .fc-offer__spins { font-size: 28px; }
+  .fc-offer__spins { font-size: 32px; }
 }
 
 /* --- tabs ---------------------------------------------------------------- */
@@ -876,13 +917,18 @@ body {
   display: flex;
   gap: 24px;
   width: 100%;
-  border-bottom: 1px solid var(--fc-border);
+  /* An inset shadow, not a border: Figma's 26px tab frame already contains the
+     rule, and a border would add a 27th pixel. */
+  box-shadow: inset 0 -1px 0 var(--fc-border);
 }
 
 .fc-tab {
   position: relative;
-  padding-bottom: 8px;
+  /* Shorthand, not padding-bottom: the UA sheet gives a button 1px of top
+     padding and that is the 27th pixel of a 26px tab frame. */
+  padding: 0 0 8px;
   font-size: 15px;
+  line-height: 18px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--fc-muted);
@@ -928,7 +974,17 @@ body {
 
 .fc-input:focus-within { border-color: var(--fc-navy); background: #fff; }
 
-.fc-input__flag { font-size: 18px; line-height: 1; }
+/* An 18x18 box either way: CONFIG.dialFlag can be an image or an emoji. */
+.fc-input__flag {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  line-height: 1;
+}
 .fc-input__dial { font-size: 15px; font-weight: 500; color: var(--fc-ink); }
 
 .fc-input input {
@@ -950,6 +1006,10 @@ body {
   justify-content: center;
   width: 28px;
   height: 28px;
+  /* padding: 0 undoes the UA button padding. Left in place it shrinks the
+     content box to 16px, and the reset's max-width:100% then squashes the
+     20px icon to match. 28 is the tap target; Figma's eye itself is 20. */
+  padding: 0;
   margin: -4px -6px -4px 0;
   border-radius: 8px;
   opacity: 0.7;
@@ -957,7 +1017,9 @@ body {
 
 .fc-eye:hover { opacity: 1; }
 .fc-eye:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
-.fc-eye img { width: 20px; height: 20px; }
+/* flex: none, or the row squeezes the icon to 16 wide and the SVG, which
+   carries preserveAspectRatio="none", squashes the eye into a ring. */
+.fc-eye img { flex: none; width: 20px; height: 20px; }
 .fc-eye[aria-pressed="true"] { opacity: 1; }
 
 .fc-field[data-invalid] .fc-input { border-color: var(--fc-orange); background: #fff5f2; }
