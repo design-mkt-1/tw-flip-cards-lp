@@ -498,26 +498,33 @@ body {
 
 .fc-cell[data-face="front"] .fc-card { cursor: default; }
 
-/* The winner ring. It marks, it does not celebrate: the visitor has to be able
-   to count to three, so it is static. A looping pulse would pull the eye back
-   to a card that is already decided. */
+/* The winner ring. It marks, it does not celebrate: while the visitor is still
+   hunting, the marker is static so they can count to three. It waits for the
+   flip to land (--fc-flip-ms) — fading in mid-rotation drew a full-size frame
+   around a card that was still an edge-on sliver.
+   Three shadows, outermost first: a hairline of gold, a tight gold core, and
+   a wider orange wash that hands off to the orange stroke baked into
+   winning_card.webp instead of fighting it. Layer count matches the reveal
+   state below so the box-shadow interpolates list-to-list. */
 .fc-card::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: 0 0 0 calc(3 * var(--cu)) var(--fc-gold),
-              0 0 calc(36 * var(--cu)) calc(6 * var(--cu)) rgb(255 217 0 / 0.45);
+  box-shadow: 0 0 0 max(1px, calc(2 * var(--cu))) var(--fc-gold),
+              0 0 calc(14 * var(--cu)) calc(2 * var(--cu)) rgb(255 217 0 / 0.5),
+              0 0 calc(34 * var(--cu)) calc(8 * var(--cu)) rgb(255 69 0 / 0.25);
   opacity: 0;
-  transition: opacity var(--fc-settle-ms) var(--fc-ease-out),
-              box-shadow var(--fc-settle-ms) var(--fc-ease-out);
+  transition: opacity var(--fc-settle-ms) var(--fc-ease-out) var(--fc-flip-ms),
+              box-shadow var(--fc-settle-ms) var(--fc-ease-out) var(--fc-flip-ms);
 }
 
 .fc-cell[data-win][data-face="front"] .fc-card::after { opacity: 1; }
 
 .fc-cell[data-win][data-face="front"] .fc-card {
-  animation: fc-settle var(--fc-settle-ms) var(--fc-ease-out) 460ms both;
+  animation: fc-settle var(--fc-settle-ms) var(--fc-ease-out)
+             calc(var(--fc-flip-ms) - 60ms) both;
 }
 
 @keyframes fc-settle {
@@ -530,9 +537,118 @@ body {
    step back. Opacity and transform only — animating a blur on six elements at
    the busiest moment on the page is the one thing guaranteed to stutter. */
 .fc-grid[data-phase="reveal"] [data-win] .fc-card::after {
-  box-shadow: 0 0 0 calc(3 * var(--cu)) var(--fc-gold),
-              0 0 calc(56 * var(--cu)) calc(10 * var(--cu)) rgb(255 217 0 / 0.75);
+  box-shadow: 0 0 0 max(1px, calc(2 * var(--cu))) var(--fc-gold),
+              0 0 calc(20 * var(--cu)) calc(4 * var(--cu)) rgb(255 217 0 / 0.65),
+              0 0 calc(48 * var(--cu)) calc(12 * var(--cu)) rgb(255 69 0 / 0.38);
   transition-delay: calc(var(--i) * 80ms);
+}
+
+/* --- landing flourish -----------------------------------------------------
+
+   Two one-shot layers, both delayed to the flip landing, both gone within a
+   second. Neither loops during the hunt.
+
+   The bloom lives on .fc-card::before at z-index:-1. .fc-card is
+   position:relative + z-index:1, so it is a stacking context of its own: the
+   negative-z pseudo paints behind .fc-flip but still inside the card, above
+   the hero background. inset -48cu keeps it inside the 56.035/58.373cu grid
+   gaps, so it never reaches a neighbouring cell. pointer-events:none matters:
+   a pseudo box is hit-tested as part of its originating button, so without it
+   the card's hit area would grow into the gap. */
+.fc-card::before {
+  content: "";
+  position: absolute;
+  inset: calc(-48 * var(--cu));
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+      rgb(255 217 0 / 0.55),
+      rgb(255 69 0 / 0.28) 55%,
+      rgb(255 69 0 / 0) 100%);
+  opacity: 0;
+}
+
+.fc-cell[data-win][data-face="front"] .fc-card::before {
+  animation: fc-bloom 900ms var(--fc-ease-out) var(--fc-flip-ms) both;
+}
+
+@keyframes fc-bloom {
+  0%   { opacity: 0; }
+  28%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The shine band lives INSIDE the front face, so the face's own
+   overflow:hidden + 44cu radius clip it, and as the later-in-tree positioned
+   sibling of .fc-prize it paints over the prize text — a specular pass, not
+   an underlay.
+   The face's own rotateY(180deg) does NOT mirror this: once .fc-flip has also
+   turned 180deg the two cancel to identity, which is exactly why the prize
+   text reads the right way round in the landed state. So local X is screen X
+   — the band starts off the left edge (-150cu, its own 110cu width clear of
+   zero) and translates positive to sweep left-to-right. Do not "fix" the sign
+   by reasoning from the face's transform alone.
+   Base opacity is 0, so nothing of it can show mid-flip even though
+   backface-visibility does not inherit to children. Transform and opacity
+   only. */
+.fc-face--front::after {
+  content: "";
+  position: absolute;
+  top: calc(-60 * var(--cu));
+  bottom: calc(-60 * var(--cu));
+  left: calc(-150 * var(--cu));
+  width: calc(110 * var(--cu));
+  pointer-events: none;
+  background: linear-gradient(to right,
+      rgb(255 255 255 / 0) 0%,
+      rgb(255 255 255 / 0.30) 42%,
+      rgb(255 244 194 / 0.5) 50%,
+      rgb(255 255 255 / 0.30) 58%,
+      rgb(255 255 255 / 0) 100%);
+  transform: skewX(-20deg) translateX(0);
+  opacity: 0;
+}
+
+.fc-cell[data-win][data-face="front"] .fc-face--front::after {
+  animation: fc-shine 640ms var(--fc-ease-out) calc(var(--fc-flip-ms) + 60ms) both;
+}
+
+@keyframes fc-shine {
+  0%   { opacity: 0; transform: skewX(-20deg) translateX(0); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: skewX(-20deg) translateX(calc(460 * var(--cu))); }
+}
+
+/* --- reveal breathe -------------------------------------------------------
+
+   The static-marker rule above holds while the visitor is still counting.
+   Once data-phase="reveal" exists all three are found and the board is
+   locked — there is nothing left to count, so a slow breathe no longer
+   competes with the game; it holds the celebratory state behind the claim
+   button after the modal is dismissed. Dedicated gradient layer on
+   .fc-cell::after (behind the card: the card's z-index:1 beats z-index:0),
+   and the loop animates opacity ONLY — the hairline never moves. Negative
+   delays phase-offset the three winners by --i so they breathe as a round. */
+.fc-cell[data-win]::after {
+  content: "";
+  position: absolute;
+  inset: calc(-40 * var(--cu));
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+      rgb(255 217 0 / 0.4),
+      rgb(255 69 0 / 0.2) 60%,
+      rgb(255 69 0 / 0) 100%);
+  opacity: 0;
+}
+
+.fc-grid[data-phase="reveal"] .fc-cell[data-win]::after {
+  animation: fc-breathe 2800ms ease-in-out calc(var(--i) * -933ms) infinite;
+}
+
+@keyframes fc-breathe {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.6; }
 }
 
 .fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) {
@@ -1129,6 +1245,20 @@ body {
   .fc-grid[data-phase="reveal"] [data-win] .fc-card::after { transition-delay: 0ms; }
   .fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) { transform: none; }
 
+  /* The ring gate needs no special case: its delay is --fc-flip-ms, which
+     this block already shortens to 220ms — it waits for the crossfade
+     exactly as it waits for the rotation. The flourishes go entirely, and
+     the breathe degrades to its own mid-point held still: the halo is the
+     information, the motion was only emphasis. */
+  .fc-cell[data-win][data-face="front"] .fc-card::before,
+  .fc-cell[data-win][data-face="front"] .fc-face--front::after { animation: none; }
+
+  .fc-grid[data-phase="reveal"] .fc-cell[data-win]::after {
+    animation: none;
+    opacity: 0.45;
+    transition: opacity var(--fc-recede-ms) var(--fc-ease-out);
+  }
+
   /* Face-down cards need a static affordance once the lift is gone. */
   .fc-cell[data-face="back"] .fc-face--back {
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.35);
@@ -1156,6 +1286,15 @@ body {
 
 @media (prefers-contrast: more) {
   .fc-grid[data-phase="reveal"] .fc-cell:not([data-win]) { opacity: 0.6; }
-  .fc-card::after { box-shadow: 0 0 0 calc(4 * var(--cu)) var(--fc-gold); }
+  /* One solid ring, no glow: soft gradients against the light hero art are
+     exactly what this preference asks to avoid. The reveal-phase selector is
+     repeated because it out-specifies a bare .fc-card::after override. */
+  .fc-card::after,
+  .fc-grid[data-phase="reveal"] [data-win] .fc-card::after {
+    box-shadow: 0 0 0 max(2px, calc(4 * var(--cu))) var(--fc-gold);
+  }
+  .fc-cell[data-win][data-face="front"] .fc-card::before,
+  .fc-cell[data-win][data-face="front"] .fc-face--front::after,
+  .fc-grid[data-phase="reveal"] .fc-cell[data-win]::after { animation: none; }
   .fc-consent, .fc-field__label, .fc-footer { color: #d5d9e0; }
 }
