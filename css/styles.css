@@ -165,6 +165,13 @@ body {
   --fc-badge-bg:    rgb(25 25 112 / 0.2);
   --fc-badge-brd:   #22223b;
   --fc-check:       #43a047;
+  /* The field outline, exactly as drawn. As a non-text UI component it
+     only owes 3:1, and it measures 3.83 against --fc-field-bg. */
+  --fc-err:         #e53935;
+  /* The message. #e53935 as 12px text is 4.23:1 on white and fails
+     1.4.3; this is the next step down the same Material red ramp and
+     measures 5.07. Indistinguishable at 12px, and legible. */
+  --fc-err-txt:     #c62828;
   --fc-link:        #00a75c;
   --fc-ink:         #2a2a2a;
 
@@ -711,13 +718,6 @@ body {
   gap: 32px;
 }
 
-.fc-footer__top {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-}
-
 .fc-fgroup {
   display: flex;
   flex-direction: column;
@@ -733,21 +733,6 @@ body {
 }
 
 .fc-frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
-
-.fc-social {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 20px;
-  background: var(--fc-badge-bg);
-  border: 1px solid var(--fc-badge-brd);
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.fc-social:hover { border-color: #3a3a63; background: rgb(25 25 112 / 0.38); }
-.fc-social img { width: 20px; height: 20px; }
 
 .fc-pay {
   display: flex;
@@ -772,12 +757,12 @@ body {
   align-items: center;
   gap: 20px;
   /* Figma's divider is a zero-height line; ours is a real pixel, so pull the
-     row back over it and the footer lands on 313 / 265 rather than 314 / 266. */
+     row back over it and the mobile footer lands on 214 rather than 215. */
   margin-top: -1px;
   font-size: 12px;
 }
 
-/* Figma's mobile footer (12:2182) is copyright only — no logo. */
+/* Figma's mobile footer (19:2784) is payments, rule, copyright — no logo. */
 .fc-footer__logo {
   display: none;
   width: 110px;
@@ -792,14 +777,39 @@ body {
    the 93.5px inside the plate's padding. Figma lets it overhang. */
 .fc-footer__logo img { flex: none; max-width: none; width: 95.525px; height: 17.143px; }
 
+/* The desktop footer (19:2691) is a single row: the logo plate hard left, the
+   copyright pushed to the far side of that same group, then the payments
+   column. The DOM stays in the mobile order — payments, rule, copyright —
+   because that is the order in which the rule actually separates something,
+   and `order` is safe here: since the social links went, the footer holds no
+   focusable element at all, so there is no tab sequence to disturb.
+
+   The payments column is 476 wide in Figma with its content flush left inside
+   it, which is what puts it 199px shy of the right edge. `flex: 0 1 476px`
+   reproduces that at 1920 and lets it collapse onto its content before the
+   copyright row starts losing room. */
 @media (min-width: 900px) {
-  .fc-footer { padding: 48px 120px 40px; }
-  .fc-footer__in { gap: 40px; }
-  .fc-footer__top { flex-direction: row; justify-content: space-between; align-items: center; gap: 24px; }
-  .fc-fgroup { align-items: flex-start; gap: 16px; }
-  .fc-fgroup--end { align-items: flex-end; }
+  /* 120 / 1920 = 6.25vw, so the artboard is reproduced exactly at 1920 and
+     the gutter eases in below it. A flat 120 leaves only 660px of content at
+     the 900 breakpoint, which is not enough for the row. */
+  .fc-footer { padding: 48px clamp(40px, 6.25vw, 120px) 40px; }
+  .fc-footer__in { flex-direction: row; align-items: flex-start; gap: 40px; }
+  /* Holds 476 while there is room and gives way down to its own content
+     before the copyright starts wrapping. */
+  .fc-fgroup { flex: 0 1 476px; min-width: max-content; align-items: flex-start; gap: 16px; }
+  .fc-footer__bottom p { white-space: nowrap; }
   .fc-flabel { font-size: 14px; }
-  .fc-footer__bottom { flex-direction: row; justify-content: space-between; font-size: 14px; }
+  .fc-divider { display: none; }
+  .fc-footer__bottom {
+    order: -1;
+    flex: 1 1 auto;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    margin-top: 0;
+    font-size: 14px;
+  }
   .fc-footer__logo { display: flex; }
 }
 
@@ -813,13 +823,19 @@ body {
 .fc-modal {
   /* 504 on desktop; on mobile Figma sits the card at x=7 in the 375 frame,
      so 360 wide, not 343. */
+  display: flex;
+  flex-direction: column;
   width: min(504px, calc(100vw - 15px));
   max-width: none;
+  /* The dialog scrolls, not the card. A phone held sideways leaves about
+     360px of height, less than half of what the form needs, and while the
+     close button lived inside the scrolling card it scrolled away with it,
+     leaving a visitor with no Escape key and almost no backdrop to tap. */
   max-height: calc(100svh - 32px);
+  overflow: hidden auto;
   padding: 0;
   border: 0;
   background: transparent;
-  overflow: visible;
   opacity: 0;
   transform: scale(0.96) translateY(8px);
   transform-origin: center;
@@ -871,23 +887,40 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  /* Figma's card (12:495 / 12:629) has no stroke, and content sits 24 from the
-     edge on mobile, 36 on desktop. A border would push both in by one more. */
+  /* Content sits 24 from the edge on mobile (19:2280), 36 on desktop
+     (19:2396). The card gained a 1px stroke in the redesign, but it is drawn
+     as an inset ring rather than a border: with border-box the border would
+     eat into that padding and drop the content box from 432 to 430, and
+     Figma's own numbers say it does not — the header group is 454.8, which is
+     432 + 22.8. An inset shadow also stays put under overflow-y: auto. */
   padding: 24px;
   background: #fff;
   border-radius: 24px;
-  box-shadow: var(--fc-shadow-modal);
+  box-shadow: var(--fc-shadow-modal), inset 0 0 0 1px var(--fc-border);
   font-family: var(--fc-ui);
-  max-height: calc(100svh - 32px);
-  overflow-y: auto;
+  width: 100%;
 }
 
 @media (min-width: 480px) { .fc-form { padding: 36px; } }
 
+/* The sign-up body and the confirmation body. The close button, the logo
+   and the offer block sit above both and are shared, so the swap is one
+   `hidden` attribute and the dialog is never reopened. */
+.fc-panel { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; }
+
+/* Sticky, and a sibling of the form rather than a child of it, so that it
+   holds its corner however far the card is scrolled. The negative bottom
+   margin cancels the 52px row it would otherwise occupy, which is what keeps
+   the card starting at the top of the dialog exactly as before. */
 .fc-close {
-  position: absolute;
+  position: sticky;
   top: 8px;
-  right: 8px;
+  z-index: 2;
+  /* flex: none, or the column's overflow makes the button a shrinkable item
+     and it collapses to the height of its own glyph. */
+  flex: none;
+  align-self: flex-end;
+  margin: 8px 8px -52px;
   width: 44px;
   height: 44px;
   display: flex;
@@ -902,16 +935,14 @@ body {
 .fc-close:hover { background: var(--fc-field-bg); color: var(--fc-navy); }
 .fc-close:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
 
-.fc-form__logo { width: 156px; height: 28px; }
-@media (min-width: 480px) { .fc-form__logo { width: 247px; height: 44px; } }
-
+.fc-form__logo { width: 101px; height: 17.992px; }
 .fc-offer {
   display: flex;
   flex-direction: column;
-  /* Figma stacks the two lines flush on mobile (12:632) and 8 apart on
-     desktop (12:498). The negative top margin is the other mobile-only
-     difference: the logo sits 16 above this block there, 24 on desktop, and
-     the form's own gap is 24. */
+  /* Mobile (19:2283) stacks all three lines flush; desktop (19:2399) opens 8
+     between the kicker and the pair under it. The negative top margin is the
+     other mobile-only difference: the logo sits 16 above this block there
+     (19:2281), 24 on desktop (19:2397), and the form's own gap is 24. */
   gap: 0;
   margin-top: -8px;
   width: 100%;
@@ -924,41 +955,31 @@ body {
   font-synthesis: none;
 }
 
-.fc-offer__title { font-size: 24px; line-height: 34.09px; color: var(--fc-navy); }
-.fc-offer__row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
+/* Figma reports Roboto's "Auto" leading on all three lines — 48px on a 22px
+   box, 71.287px on a 34px box. Those are the numbers the type tool prints,
+   not the boxes it draws, and taken literally they add some 60px of dead
+   leading to a card that is already tall. The boxes are what the layout is
+   built on, so the boxes are what ship. Same call as --fc-auto-lh, section 3. */
+.fc-offer__title  { font-size: 16px; line-height: 22px; color: var(--fc-navy); }
+.fc-offer__lines  { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.fc-offer__amount { font-size: 50px; line-height: 53px; white-space: nowrap; color: var(--fc-orange); }
+.fc-offer__spins  { font-size: 34px; line-height: 34px; white-space: nowrap; color: var(--fc-navy-ink); }
+
+/* Below the 375 Figma draws, the 278px-wide amount stops fitting: a 320px
+   phone leaves 257 inside the card. Nothing else needs to move. */
+@media (max-width: 359px) {
+  .fc-offer__amount { font-size: 44px; line-height: 47px; }
+  .fc-offer__spins  { font-size: 30px; line-height: 30px; }
 }
-.fc-offer__pct  {
-  font-size: 74px;
-  line-height: var(--fc-auto-lh);
-  white-space: nowrap;
-  color: var(--fc-orange);
-}
-.fc-offer__side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 107.585px;
-  color: var(--fc-navy-ink);
-}
-.fc-offer__num   { display: block; width: 100%; font-size: 54px; line-height: 50.628px; }
-.fc-offer__spins { display: block; width: 100%; font-size: 22px; line-height: var(--fc-auto-lh); }
 
 @media (min-width: 480px) {
   /* The offer block is wider than the fields under it: Figma insets it 24.6
-     against 36 for everything else, and the row needs all 450px of that. */
-  .fc-offer        { gap: 8px; width: calc(100% + 22.8px); margin: 0 -11.4px; }
-  .fc-offer__title { font-size: 34px; line-height: 48px; }
-  .fc-offer__row   { gap: 20.05px; }
-  /* 130px type in a 99.134px box, exactly as Figma draws it (12:501). A taller
-     line box is what pushed the whole form 25px long. */
-  .fc-offer__pct   { font-size: 130px; line-height: 99.134px; width: 278.465px; }
-  .fc-offer__side  { width: 151.485px; }
-  .fc-offer__num   { font-size: 77px; line-height: 71.287px; }
-  .fc-offer__spins { font-size: 32px; }
+     against 36 for everything else, and 250000 ГРН wants all 358 of that. */
+  .fc-offer         { gap: 8px; width: calc(100% + 22.8px); margin: 0 -11.4px; }
+  .fc-offer__title  { font-size: 24px; line-height: 28px; }
+  .fc-offer__lines  { gap: 14px; }
+  .fc-offer__amount { font-size: 74px; line-height: 60px; }
+  .fc-offer__spins  { font-size: 44px; line-height: 34px; }
 }
 
 /* --- tabs ---------------------------------------------------------------- */
@@ -1055,7 +1076,7 @@ body {
   width: 28px;
   height: 28px;
   /* 28 is the tap target; Figma's eye itself is 20. */
-  margin: -4px -6px -4px 0;
+  margin: -4px -6px -4px 4px;
   border-radius: 8px;
   opacity: 0.7;
 }
@@ -1067,12 +1088,36 @@ body {
 .fc-eye img { flex: none; width: 20px; height: 20px; }
 .fc-eye[aria-pressed="true"] { opacity: 1; }
 
-.fc-field[data-invalid] .fc-input { border-color: var(--fc-orange); background: #fff5f2; }
+/* --- the three field states ---------------------------------------------
+   The tick is aria-hidden: the real state is aria-invalid on the input, which
+   flip.js already writes. A live-region "valid" would fire on every blur and
+   say nothing the absence of an error does not already say. */
+
+.fc-ok {
+  flex: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  /* 4 + the row's own 8 = the 12 Figma sets on the shell (19:2122). */
+  margin-left: 4px;
+  border-radius: 10px;
+  background: var(--fc-check);
+}
+.fc-ok img { flex: none; width: 10px; height: 10px; }
+
+.fc-field[data-valid] .fc-ok    { display: flex; }
+.fc-field[data-valid] .fc-input { border-color: var(--fc-check); }
+
+/* After the valid rules on purpose: equal specificity, so if both attributes
+   were ever set at once the field would still read as wrong, not as right. */
+.fc-field[data-invalid] .fc-input { border-color: var(--fc-err); }
 
 .fc-error {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--fc-orange);
+  color: var(--fc-err-txt);
   min-height: 0;
 }
 
@@ -1131,7 +1176,7 @@ body {
   outline-offset: 2px;
 }
 
-.fc-consent[data-invalid] .fc-consent__box { border-color: var(--fc-orange); }
+.fc-consent[data-invalid] .fc-consent__box { border-color: var(--fc-err); }
 .fc-consent a { color: var(--fc-link); font-weight: 600; text-decoration: none; }
 .fc-consent a:hover { text-decoration: underline; }
 
@@ -1154,6 +1199,7 @@ body {
   font-weight: 700;
   line-height: 20px;
   text-transform: uppercase;
+  text-decoration: none;
   transition: filter 140ms ease, transform 120ms var(--fc-ease-out);
 }
 
@@ -1164,6 +1210,91 @@ body {
 .fc-signin { font-size: 14px; font-weight: 500; color: var(--fc-muted); }
 .fc-signin a { color: var(--fc-orange); font-weight: 700; text-decoration: none; }
 .fc-signin a:hover { text-decoration: underline; }
+
+/* --- the confirmation screen -------------------------------------------- */
+
+/* Not .fc-divider: that one is rgb(156 163 175 / .16), a light-on-dark rule
+   drawn for the navy footer. On the white card it has to be --fc-border. */
+.fc-rule { width: 100%; height: 1px; background: var(--fc-border); }
+
+.fc-done__title {
+  font-family: var(--fc-display);
+  font-size: 20px;
+  font-weight: 900;
+  font-style: italic;
+  /* wdth 100. The offer block above runs at 75, and this line does not
+     (19:2558) — it is the one place the condensed axis is let go. */
+  font-stretch: 100%;
+  font-synthesis: none;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--fc-navy);
+}
+
+/* Focus lands here when the screen swaps in, so that it is announced. A ring
+   on a heading nobody clicked reads as a rendering fault, so there is none —
+   and no :focus-visible rule either, since it is never reached by keyboard. */
+.fc-done__title:focus { outline: none; }
+
+.fc-creds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  background: var(--fc-field-bg);
+  border: 1px solid var(--fc-border);
+  border-radius: 12px;
+}
+
+.fc-cred { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.fc-cred__key { flex: none; font-size: 14px; font-weight: 600; color: var(--fc-muted); }
+
+/* Figma's value is a nowrap run between the label and the button. A login can
+   be an email address, which is longer than anything drawn, so it is allowed
+   to shrink and break rather than push the copy button off the card. */
+.fc-cred__val {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fc-ink);
+  overflow-wrap: anywhere;
+}
+
+.fc-cred__copy {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  /* 28 is the tap target; Figma's glyph is 18 on mobile, 20 on desktop.
+     Named __copy, not .fc-copy: that one is the hero's copy block, which is
+     position:absolute — the collision put these buttons on the backdrop. */
+  margin: -4px -4px -4px 0;
+  border-radius: 8px;
+  opacity: 0.7;
+}
+
+.fc-cred__copy:hover { opacity: 1; }
+.fc-cred__copy:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 2px; }
+.fc-cred__copy img { flex: none; width: 18px; height: 18px; }
+
+.fc-done .fc-actions { gap: 14px; }
+.fc-done .fc-signin  { font-size: 13px; }
+
+@media (min-width: 480px) {
+  .fc-form__logo       { width: 247px; height: 44px; }
+  .fc-done__title      { font-size: 24px; }
+  .fc-creds            { gap: 14px; padding: 20px; }
+  .fc-cred__copy img         { width: 20px; height: 20px; }
+  .fc-done .fc-actions { gap: 16px; }
+  .fc-done .fc-signin  { font-size: 14px; }
+}
+
 
 /* The standing claim button under the grid. It exists so that dismissing the
    modal does not lose the offer — a promo page that throws away the CTA on
@@ -1296,5 +1427,9 @@ body {
   .fc-cell[data-win][data-face="front"] .fc-card::before,
   .fc-cell[data-win][data-face="front"] .fc-face--front::after,
   .fc-grid[data-phase="reveal"] .fc-cell[data-win]::after { animation: none; }
-  .fc-consent, .fc-field__label, .fc-footer { color: #d5d9e0; }
+  /* #d5d9e0 is the light-on-navy value. .fc-consent and .fc-field__label
+     sit on the white card, where it measures 1.3:1 — the preference was
+     making them invisible. They darken instead. */
+  .fc-footer { color: #d5d9e0; }
+  .fc-consent, .fc-field__label, .fc-cred__key { color: #3f4654; }
 }

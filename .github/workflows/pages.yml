@@ -42,6 +42,23 @@ jobs:
             fi
           done
 
+      - name: The tag sequences must match, element for element
+        run: |
+          python3 - <<'PY'
+          import re, io
+          seq = lambda p: re.findall(r'</?([a-zA-Z][\w-]*)', io.open(p, encoding='utf-8').read())
+          a = seq('index.html')
+          for f in ('ru.html', 'en.html'):
+              b = seq(f)
+              if a != b:
+                  i = next(i for i, (x, y) in enumerate(zip(a + [None] * 9, b + [None] * 9)) if x != y)
+                  raise SystemExit(
+                      '::error::%s diverges at tag #%d: index.html has <%s>, %s has <%s>. '
+                      'Compare them with: git diff --no-index --word-diff index.html %s'
+                      % (f, i, a[i], f, b[i], f))
+          print('tag sequences match: %d tags' % len(a))
+          PY
+
       - name: Stage the served files
         run: |
           mkdir -p _site

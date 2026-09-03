@@ -41,21 +41,23 @@ SVG_PASSTHROUGH = {
     "icon-eye.svg": ICONS,
     "flag-ua.svg": ICONS,
     "icon-check.svg": ICONS,
-    "social-telegram.svg": ICONS,
-    "social-youtube.svg": ICONS,
-    "social-tiktok.svg": ICONS,
-    "social-instagram.svg": ICONS,
-    "social-facebook.svg": ICONS,
+    "icon-copy.svg": ICONS,
     "pay-visa.svg": ICONS,
     "pay-mastercard.svg": ICONS,
     "pay-tether.svg": ICONS,
     "pay-bitcoin.svg": ICONS,
 }
 
-# Two entries above are not plain Figma exports. flag-ua.svg is not an export
+# Three entries above are not plain Figma exports. flag-ua.svg is not an export
 # at all: it stands in for the emoji Windows cannot draw. icon-eye.svg is an
-# export plus the pupil, which the exporter drops. Both are explained in the
-# README, section 7.
+# export plus the pupil, which the exporter drops. icon-copy.svg is drawn by
+# hand from the two rectangles Figma composes the copy button out of
+# (19:2532 / 19:2533), because they are frame borders, not a vector node.
+# All three are explained in the README, section 7.
+
+# The five social-*.svg exports are deliberately NOT copied either. The footer
+# the design team redrew (Figma 19:2691 / 19:2784) has no social row at all.
+# The exports stay in raw/ so the row can be put back without a fresh export.
 
 # raw/img/card-glow.svg and raw/img/card-sphere.svg are deliberately NOT
 # copied. Both sit above the card's top edge inside a clipped container, so

@@ -19,8 +19,11 @@ The three files are structurally identical. Only the text differs. Mount them
 wherever your routing expects, for example `/ua/`, `/ru/` and `/en/`.
 
 **The game:** nine cards face down, three of them hide the 650% + 250 FS
-bonus. The visitor flips cards to find those three. When the third one turns
-up, the registration form opens.
+card. The visitor flips cards to find those three. When the third one turns
+up, the registration form opens, offering the welcome bonus — 250000 UAH +
+250 free spins. The cards are the game's own 650 / 250 / 100 percent ladder;
+the welcome bonus in the form is a separate offer, and it is the one the
+platform pays out.
 
 ---
 
@@ -35,8 +38,9 @@ Everything in rows 1 to 3 sits inside one commented block at the top of
 | 2 | Extra values on the submission | `CONFIG.hiddenFields` — affiliate id, campaign, CSRF token             |
 | 3 | Terms / Privacy / Login links | `CONFIG.termsUrl`, `CONFIG.privacyUrl`, `CONFIG.loginUrl`              |
 | 4 | Phone country                 | `CONFIG.dialCode`, `CONFIG.dialFlag`, `CONFIG.phoneDigits`             |
-| 5 | Social profile links          | the five `<a class="fc-social" href="#">` in each HTML file            |
-| 6 | Logo click target             | wrap `.fc-plate img` in an `<a>` in each HTML file                     |
+| 5 | Where the confirmation screen's button goes | `CONFIG.siteUrl`                                 |
+| 6 | What the platform is told the bonus was | `CONFIG.bonusCode` — travels as `bonus` on the payload |
+| 7 | Logo click target             | wrap `.fc-plate img` in an `<a>` in each HTML file                     |
 
 `CONFIG.dialFlag` takes either an emoji or a path to an 18 x 18 image, and
 ships as `assets/img/icons/flag-ua.svg`. Windows has no flag glyphs at all —
@@ -64,16 +68,56 @@ validation passes, and you own the request from that point.
 ```js
 onRegister: function (payload, form) {
   // payload = { method, phone, email, password, consent, lang, bonus, ...hiddenFields }
-  fetch('/api/signup', {
+  return fetch('/api/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
-  });
+  }).then(function (r) { return r.json(); })
+    .then(function (d) { return { login: d.login, password: d.password }; });
 }
 ```
 
 With neither set, nothing is sent. The validated payload is written to the
 browser console instead, so the page is fully demoable before it is wired.
+
+---
+
+## 2a. The confirmation screen
+
+The dialog has a second screen: **Реєстрація успішна!**, with the login and
+password your platform issued, a copy button on each, and a button to the
+site. It is a second panel inside the same `<dialog>` — the close button, the
+logo and the offer block are shared — so it swaps in place and the dialog is
+never closed and reopened.
+
+Two ways to reach it, and they match the two routes above.
+
+**Return the credentials.** If `onRegister` returns a promise that resolves
+with `{ login, password }`, the screen fills itself in and appears. That is
+the snippet in route B above.
+
+**Or call it yourself,** at whatever moment suits your flow:
+
+```js
+TWFlip.showDone({ login: '+380 93 123 4567', password: 'a1B2c3D4' });
+TWFlip.showForm();   // back to the form
+```
+
+Both values are inserted with `textContent`, never as HTML. Pass `''` for
+either one and that row is hidden. Set `CONFIG.siteUrl` for the orange button;
+left empty it stays inert.
+
+On **route A** the screen never appears — the browser navigates to your
+`action` and your own page renders the result.
+
+To walk the screen end to end before the platform exists, set
+`CONFIG.autoDone: true`. It fires only on the route where nothing is wired at
+all, so it cannot reach production: set an `action` or an `onRegister` and it
+is skipped.
+
+Copying uses `navigator.clipboard`, which needs a secure context. Over `https`
+it works; opened from `file://` it falls back to selecting the text so `Ctrl+C`
+still gets it.
 
 ---
 
@@ -86,6 +130,8 @@ browser console instead, so the page is fully demoable before it is wired.
 - **No CSRF token.** Add it through `CONFIG.hiddenFields`, or as a hidden
   input in the form.
 - **No consent or cookie banner.**
+- **No credentials are invented.** The confirmation screen shows whatever you
+  hand it and nothing else; with nothing wired it never opens.
 - **Game state is not persisted.** Reloading restarts the game. That is
   deliberate for a campaign page.
 - **Every card can be flipped.** A visitor who turns all nine always finds the
@@ -129,6 +175,13 @@ with a WebP fallback.
   cards deliberately cast no CSS shadow at all.
 - **Remove `overflow: hidden` from `.fc-face`,** or add it to `.fc-flip`.
   Same reason, in reverse.
+- **Move the scrolling back onto `.fc-form`.** The `<dialog>` is the scroll
+  container and `.fc-close` is a sticky sibling of the form, not a child of
+  it. Put `overflow-y: auto` on the card again and the close button scrolls
+  away with the content — on a phone held sideways that leaves no way out.
+- **Reuse the class name `fc-copy` for anything new.** It is already the
+  hero's copy block, and it is `position: absolute`. The copy buttons on the
+  confirmation screen are `fc-cred__copy` for exactly that reason.
 
 ---
 
@@ -145,8 +198,13 @@ git diff --no-index --word-diff=color index.html ru.html
 ```
 
 Only translated words should appear in that output. A tag, a class or an
-`href` in it means the files have drifted apart. The GitHub Actions workflow
-runs a coarser version of the same check on every push.
+`href` in it means the files have drifted apart.
+
+The GitHub Actions workflow runs two mechanical versions of the same check on
+every push: the three files must carry the same number of `<` characters, and
+their **tag sequences** must be identical element for element. The second one
+is what catches a reordered tab or a panel nested one level deeper — the
+character count alone would not.
 
 Every element carrying translatable text also has a `data-i18n` attribute.
 Nothing reads it. It is a marker, so the diff has a stable anchor and so a
@@ -177,7 +235,7 @@ python tools/optimize.py
 | Icons and logo   | SVG                     | ~20 KB |
 | Fonts            | 4 WOFF2 subsets         | 117 KB |
 
-Two icons are not straight Figma exports:
+Three icons are not straight Figma exports:
 
 - `flag-ua.svg` is not an export at all. It is the stand-in for the 🇺🇦
   emoji. See row 4 of section 1.
@@ -185,6 +243,14 @@ Two icons are not straight Figma exports:
   12:523 carries only the almond; the pupil is a second circle that the
   exporter drops. It is restored by hand in `raw/img/icon-eye.svg`, and a
   fresh export will lose it again.
+- `icon-copy.svg` is drawn by hand. Figma composes the copy button out of two
+  frame borders (`19:2532` / `19:2533`) rather than a vector node, so there is
+  nothing there to export.
+
+The five `social-*.svg` files are still in `raw/` but are no longer copied
+into `assets/`: the footer the design team redrew (`19:2691` / `19:2784`) has
+no social row. Put the five lines back into `SVG_PASSTHROUGH` in
+`tools/optimize.py` if it ever returns.
 
 Two things worth knowing about the assets:
 
@@ -217,10 +283,20 @@ These are load-bearing. Please keep them when you integrate.
   page on focus, which looks like a bug mid-registration.
 - Under `prefers-reduced-motion` the flip becomes a crossfade rather than
   disappearing, and the press feedback is deliberately kept.
+- The green tick on a valid field is `aria-hidden`. The state a screen reader
+  needs is `aria-invalid` on the input, which the script already writes, and
+  announcing "valid" on every blur would say nothing the absence of an error
+  does not already say.
+- The dialog scrolls, the card does not, and the close button is sticky. A
+  phone held sideways leaves about 360px of height — less than half of what
+  the form needs — and there is no Escape key on a touch device.
+- On the confirmation screen focus moves to the heading, and the dialog's
+  `aria-labelledby` follows it, so the new screen is announced without the
+  dialog being closed and reopened.
 
 ---
 
-## 9. Two questions for the design team
+## 9. Open questions for the design team
 
 1. The phone prefix stays Ukrainian, `+380`, in the Russian and English
    versions too. That is how the Figma file is drawn. If this campaign is not
@@ -228,3 +304,32 @@ These are load-bearing. Please keep them when you integrate.
 2. Figma styles the two consent links green only in the Ukrainian version, and
    sets the copyright line in bold only in the Russian one. Both were
    normalised across all three languages.
+3. **The cards and the form now promise different things.** The nine cards run
+   a 650 / 250 / 100 percent ladder; the form offers 250000 UAH + 250 FS. That
+   is what the two Figma sections draw, and it reads as a funnel — but a
+   visitor who hunts for "650%" and is then shown a hryvnia figure may not
+   join the two up. The card text lives in `CONFIG.deck`.
+4. **The registration form is only drawn in Ukrainian** (`19:2017`); only the
+   footer has all three languages. The Russian and English strings in the form
+   and on the confirmation screen were translated here and should be read by
+   someone who owns the copy. The amount is written `250000 ГРН` on the
+   Ukrainian and Russian pages and `250000 UAH` on the English one.
+5. **The popup node has no close button.** One was kept: Escape is not a
+   discoverable dismissal on a touch device, and with the card filling a
+   phone screen there is almost no backdrop left to tap.
+6. **Four colours in the new design fall short of WCAG AA (4.5:1) for small
+   text.** They are brand colours, so they were left alone — this is a note,
+   not a change:
+
+   | element | colour on | ratio |
+   |---|---|---|
+   | consent links, 13px | `#00a75c` on white | 3.12 |
+   | "Увійти", 14px | `#ff4500` on white | 3.44 |
+   | placeholders, credential labels | `#737b8c` on `#f3f4f5` | 3.86 |
+   | consent text, inactive tab | `#737b8c` on white | 4.25 |
+
+   `#6b7280` for `--fc-muted` and `#007a43` for `--fc-link` would clear AA and
+   are hard to tell apart from the current pair. The one place this **was**
+   changed is the error message: Figma draws it `#e53935`, which is 4.23:1 at
+   12px, so the text uses `#c62828` (5.07:1) from the same red ramp while the
+   field outline stays exactly `#e53935` as drawn.
