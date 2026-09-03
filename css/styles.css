@@ -54,6 +54,12 @@ body {
 .fc-root :where(button) {
   font: inherit;
   color: inherit;
+  /* The UA sheet gives every button 1px 6px of padding. Left in, it insets a
+     button's children by different amounts per axis: on the cards it pushed
+     the face art 6px off the left and right edges but only 1px off the top
+     and bottom, visibly off-centre inside the gold ring. Zeroed here once;
+     buttons that want padding set their own. */
+  padding: 0;
   background: none;
   border: 0;
   cursor: pointer;
@@ -891,9 +897,7 @@ body {
 
 .fc-tab {
   position: relative;
-  /* Shorthand, not padding-bottom: the UA sheet gives a button 1px of top
-     padding and that is the 27th pixel of a 26px tab frame. */
-  padding: 0 0 8px;
+  padding-bottom: 8px;
   font-size: 15px;
   line-height: 18px;
   font-weight: 700;
@@ -973,10 +977,7 @@ body {
   justify-content: center;
   width: 28px;
   height: 28px;
-  /* padding: 0 undoes the UA button padding. Left in place it shrinks the
-     content box to 16px, and the reset's max-width:100% then squashes the
-     20px icon to match. 28 is the tap target; Figma's eye itself is 20. */
-  padding: 0;
+  /* 28 is the tap target; Figma's eye itself is 20. */
   margin: -4px -6px -4px 0;
   border-radius: 8px;
   opacity: 0.7;
