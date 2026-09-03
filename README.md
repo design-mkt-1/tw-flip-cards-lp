@@ -125,8 +125,8 @@ with a WebP fallback.
   AVIF is 23 KB and looks the same.
 - **Put a CSS `filter` on `.fc-flip` or `.fc-face`.** `filter` forces
   `transform-style` back to `flat`, and the card flip collapses into a
-  sideways squash. The card's shadow lives on `.fc-cell::before` for exactly
-  this reason.
+  sideways squash. The same goes for `box-shadow` on the rotating nodes: the
+  cards deliberately cast no CSS shadow at all.
 - **Remove `overflow: hidden` from `.fc-face`,** or add it to `.fc-flip`.
   Same reason, in reverse.
 

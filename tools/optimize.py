@@ -19,7 +19,7 @@ from pathlib import Path
 import shutil
 import sys
 
-from PIL import Image, features
+from PIL import Image, ImageFilter, features
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "raw" / "img"
@@ -86,9 +86,86 @@ def write_pair(im: Image.Image, stem: str) -> None:
     print(f"  {webp.name:<24} {kb(webp)}")
 
 
+def erase_baked_card_shadows(im: Image.Image, box: tuple, feather: int = 24) -> None:
+    """
+    Paint out the card shadows Figma baked onto the platform.
+
+    The scene was composed with three ellipse shadows under the spots where
+    the bottom card row sits in the 1920x1080 comp. The real grid is laid out
+    responsively and never lines up with them, so on the page they read as
+    three random dark blobs floating on the platform (owner request,
+    2026-09-03: remove them).
+
+    The platform surface is a smooth near-vertical gradient, so each column
+    of the strip is rebuilt by linearly interpolating between the clean rows
+    just above and below the box, which also preserves the subtle vertical
+    streaks. The patch is blended in through a feathered mask so no seam
+    shows at the edges.
+    """
+    x1, y1, x2, y2 = box
+    src = im.load()
+    w, h = x2 - x1, y2 - y1
+
+    def refs(y):
+        """One reference pixel per column, with neon-line crossings repaired.
+
+        The hexagon's bright edge lines clip the corners of the reference
+        rows. A contaminated reference would smear a bright streak down the
+        whole column, so any pixel well above the row's median luminance is
+        replaced by its nearest clean neighbour (the platform gradient
+        changes slowly along x, so the neighbour is a faithful stand-in).
+        """
+        row = [src[x1 + ix, y] for ix in range(w)]
+        lums = [0.299 * r[0] + 0.587 * r[1] + 0.114 * r[2] for r in row]
+        limit = sorted(lums)[w // 2] + 22
+        for i in range(w):
+            if lums[i] <= limit:
+                continue
+            for j in range(1, w):
+                if i - j >= 0 and lums[i - j] <= limit:
+                    row[i] = row[i - j]
+                    break
+                if i + j < w and lums[i + j] <= limit:
+                    row[i] = row[i + j]
+                    break
+        return row
+
+    top_refs = refs(y1 - 2)
+    bot_refs = refs(y2 + 1)
+
+    patch = Image.new("RGB", (w, h))
+    pp = patch.load()
+    for ix in range(w):
+        top = top_refs[ix]
+        bot = bot_refs[ix]
+        for iy in range(h):
+            t = (iy + 1) / (h + 1)
+            pp[ix, iy] = tuple(round(top[c] + (bot[c] - top[c]) * t) for c in range(3))
+    patch = patch.filter(ImageFilter.GaussianBlur(1.2))
+
+    mask = Image.new("L", (w, h), 255)
+    mp = mask.load()
+    v_feather = max(3, h // 8)
+    for ix in range(w):
+        hx = min(ix, w - 1 - ix)
+        for iy in range(h):
+            hy = min(iy, h - 1 - iy)
+            v = 255
+            if hx < feather:
+                v = min(v, round(255 * hx / feather))
+            if hy < v_feather:
+                v = min(v, round(255 * hy / v_feather))
+            mp[ix, iy] = v
+
+    im.paste(patch, (x1, y1), mask)
+
+
 def build_hero() -> None:
     print("hero")
     src = flatten(Image.open(RAW / "hero-desktop.png"))
+    # Ellipse strip measured on the 1920x1080 export; the box stops short of
+    # the platform's neon edge lines and the star art on every side.
+    erase_baked_card_shadows(src, (1150, 916, 1786, 970))
     # 1920 is the native export width. Never upscale past it.
     for width in (1280, 1920):
         if width > src.width:
@@ -97,6 +174,9 @@ def build_hero() -> None:
         write_pair(src.resize((width, h), Image.LANCZOS), f"hero-{width}")
 
     mob = flatten(Image.open(RAW / "hero-mobile.png"))
+    # The same baked shadows, measured on the 375x666 export. The bottom edge
+    # sits just above the platform's neon line at y=584.
+    erase_baked_card_shadows(mob, (36, 556, 352, 582), feather=16)
     write_pair(mob, f"hero-m-{mob.width}")
     if mob.width < 750:
         print(

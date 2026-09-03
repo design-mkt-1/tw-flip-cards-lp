@@ -177,9 +177,9 @@ body {
   --fc-display: "Roboto Flex", "Roboto Fallback", "Arial Narrow", Arial, sans-serif;
   --fc-ui:      "Inter Var", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Elevation */
-  --fc-shadow-card:  0 calc(4 * var(--cu)) calc(12 * var(--cu)) rgb(0 0 0 / 0.5);
-  --fc-shadow-lift:  0 calc(18 * var(--cu)) calc(34 * var(--cu)) rgb(0 0 0 / 0.55);
+  /* Elevation. The cards themselves cast no CSS shadow: at mobile scale a
+     card-unit shadow collapses into a hard dark slab, so it was removed
+     outright rather than tuned (owner's call, 2026-09-03). */
   --fc-shadow-plate: 0 3.657px 1.829px rgb(0 0 0 / 0.25);
   --fc-shadow-modal: 0 12px 12px rgb(25 25 112 / 0.08);
   --fc-shadow-cta:   0 4px 6px rgb(255 69 0 / 0.19);
@@ -372,48 +372,11 @@ body {
   height: calc(381 * var(--cu));
 }
 
-/* Shadow plates.
-   The card's shadow must NOT live on the rotating element. As a CSS filter it
-   would flatten the 3D context and kill the flip; as a box-shadow on the
-   rotating node it would swing around with the card, as if the light source
-   were orbiting. So it lives on two pseudo-elements of the still cell, and the
-   hover change is an opacity crossfade between them — compositor only, no
-   repaint. An outer box-shadow paints outside the border box, so a plate with
-   no background still casts, with the card sitting over the hole. */
-.fc-cell::before,
-.fc-cell::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  border-radius: calc(44 * var(--cu));
-  pointer-events: none;
-  transition: opacity var(--fc-hover-ms) var(--fc-ease-out);
-}
-
-.fc-cell::before { box-shadow: var(--fc-shadow-card); opacity: 1; }
-.fc-cell::after  { box-shadow: var(--fc-shadow-lift); opacity: 0;
-                   transform: translateY(calc(3 * var(--cu))); }
-
-/* The dip while the card turns edge-on. Values already sample |cos t| at the
-   eased angle, so the keyframe itself is linear — easing it as well would
-   double-count. A card flips once and then locks, so a one-shot keyframe is
-   the right tool here rather than a transition. */
-.fc-cell[data-flipping]::before { animation: fc-shadow-dip var(--fc-flip-ms) linear; }
-.fc-cell[data-flipping]::after  { opacity: 0; }
-
-@keyframes fc-shadow-dip {
-  0%, 100% { transform: scaleX(1);    opacity: 1;   }
-  25%, 75% { transform: scaleX(.895); opacity: .92; }
-  50%      { transform: scaleX(.06);  opacity: .30; }
-}
-
-
 /* ==========================================================================
    8. CARD
 
    Three levels, and they never share a job:
-     .fc-cell   layout box and shadow, never moves
+     .fc-cell   layout box, never moves
      .fc-card   perspective host, hit target, focus ring, all 2D transforms
      .fc-flip   preserve-3d, and its transform is rotateY and nothing else
    ========================================================================== */
@@ -524,8 +487,6 @@ body {
   .fc-cell[data-face="back"] .fc-card:hover {
     transform: translateY(calc(-9 * var(--cu)));
   }
-  .fc-cell[data-face="back"]:hover::before { opacity: 0; }
-  .fc-cell[data-face="back"]:hover::after  { opacity: 1; }
 }
 
 .fc-card:active { transform: scale(0.975); transition-duration: 100ms; }
@@ -1162,9 +1123,6 @@ body {
 
   .fc-cell[data-face="front"] .fc-face--front { opacity: 1; }
   .fc-cell[data-face="front"] .fc-face--back  { opacity: 0; }
-
-  .fc-cell::before,
-  .fc-cell::after { animation: none !important; }
 
   .fc-cell[data-win][data-face="front"] .fc-card { animation: none; }
 

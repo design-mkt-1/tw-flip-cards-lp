@@ -303,7 +303,6 @@
        cannot turn a tenth card while the win sequence runs. */
     if (isWin && state.found === CONFIG.winTarget - 1) state.locked = true;
 
-    cell.dataset.flipping = '';
     cell.dataset.face = 'front';
     if (isWin) cell.dataset.win = '';
     btn.style.willChange = 'transform';
@@ -317,7 +316,6 @@
        will-change layer would leak. Dropping will-change is also what forces
        the crisp re-rasterisation at rest. */
     window.setTimeout(function () {
-      cell.removeAttribute('data-flipping');
       btn.style.willChange = '';
     }, T.flip);
 
