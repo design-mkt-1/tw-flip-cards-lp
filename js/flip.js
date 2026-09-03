@@ -268,6 +268,10 @@
       if (prizes[i].id === CONFIG.winPrizeId) {
         /* Drives the 80ms stagger of the marking sweep, in DOM order. */
         cell.style.setProperty('--i', String(winIndex++));
+        /* The orange-outlined face art, applied from styles.css. Set here at
+           build time rather than at flip time so the image is fetched with
+           the page, not in the middle of the first winning flip. */
+        cell.dataset.winFace = '';
       }
       frag.appendChild(cell);
     }

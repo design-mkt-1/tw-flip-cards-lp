@@ -19,7 +19,7 @@ from pathlib import Path
 import shutil
 import sys
 
-from PIL import Image, ImageFilter, features
+from PIL import Image, features
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "raw" / "img"
@@ -38,7 +38,6 @@ WEBP_Q = 80
 # SVGs that are copied through untouched.
 SVG_PASSTHROUGH = {
     "logo-topwin.svg": OUT,
-    "card-back-art.svg": OUT,
     "icon-eye.svg": ICONS,
     "flag-ua.svg": ICONS,
     "icon-check.svg": ICONS,
@@ -109,42 +108,32 @@ def build_hero() -> None:
         )
 
 
-def build_card_back() -> None:
+def build_card_faces() -> None:
     """
-    The design blurs this photo by 2px behind a 365x488 frame.
+    The three card faces are supplied as finished art, authored at exactly
+    twice the 272x381 card of the design:
 
-    Do not "fix" the softness by dropping the blur. Figma's render of the
-    symbol on its own (node 12:283) IS sharp, because the blur lives above it
-    and is not part of an isolated node render -- but the composed 1920 frame
-    (12:320) shows it. Fitting a Gaussian to that frame lands on 2.0 in the
-    365px frame's units, which is what the line below reproduces: sweeping the
-    radius against the crop inside card 1 bottoms out at 1.3px on screen
-    (mean 3.45 against 4.81 unblurred and 5.24 at twice the radius).
+        closed_card.png   the back everyone sees first (TW logo, coins)
+        simple_card.png   the revealed face of a 100% / 250% card
+        winning_card.png  the revealed face of a 650% card (orange outline)
 
-    The blur is baked in here rather than done with a CSS filter. A CSS filter
-    on an element that is rotated in 3D, nine times over, forces a filter pass
-    per card per frame, and Safari has a long-standing bug where a rounded
-    clip leaks square corners around a blurred child. Baking it costs nothing
-    at runtime and compresses far better, because the blur has already thrown
-    away the high frequencies the encoder would otherwise have to store.
+    Each 640x858 export carries its own baked drop shadow around a 544x762
+    card body at (48, 40). The shadow is cropped away, NOT kept: the page
+    already casts the card's shadow from CSS (see styles.css section 7), and
+    it has to stay there because it changes on hover and must not rotate with
+    the flip.
+
+    Alpha is kept so the rounded corners composite cleanly over the page
+    gradient. The corner radius in the art is 88px, which is the design's
+    44 card units at this 2x scale -- the same radius styles.css clips to.
     """
-    print("card back")
-    src = Image.open(RAW / "card-back-photo.png")
-
-    # Target 2x the largest on-screen size: 365 design px * 0.6487 desktop
-    # scale * 2 for retina is 473, rounded up to 480.
-    target_w = 480
-    target_h = round(target_w * 488 / 365)  # keep the design's 365:488 frame
-    im = flatten(src).resize((target_w, target_h), Image.LANCZOS)
-
-    # The design's 2px blur is measured at 365px wide, so scale it up with the
-    # image.
-    radius = 2.0 * target_w / 365
-    im = im.filter(ImageFilter.GaussianBlur(radius=radius))
-
-    out = OUT / "card-back.webp"
-    im.save(out, format="WEBP", quality=WEBP_Q, method=6)
-    print(f"  {out.name:<24} {kb(out)}  ({target_w}x{target_h}, blur {radius:.2f}px)")
+    print("card faces")
+    body = (48, 40, 592, 802)  # 544x762 = 272x381 at 2x, measured from alpha
+    for name in ("closed_card", "simple_card", "winning_card"):
+        im = Image.open(RAW / f"{name}.png").convert("RGBA").crop(body)
+        out = OUT / f"{name}.webp"
+        im.save(out, format="WEBP", quality=WEBP_Q, method=6)
+        print(f"  {out.name:<24} {kb(out)}  ({im.width}x{im.height})")
 
 
 def copy_svgs() -> None:
@@ -174,7 +163,7 @@ def main() -> int:
     ICONS.mkdir(parents=True, exist_ok=True)
 
     build_hero()
-    build_card_back()
+    build_card_faces()
     copy_svgs()
 
     total = sum(p.stat().st_size for p in OUT.rglob("*") if p.is_file())

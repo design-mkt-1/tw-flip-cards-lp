@@ -160,7 +160,6 @@ body {
   --fc-badge-brd:   #22223b;
   --fc-check:       #43a047;
   --fc-link:        #00a75c;
-  --fc-card-line:   #d9d9d9;
   --fc-ink:         #2a2a2a;
 
   /* Type.
@@ -178,17 +177,6 @@ body {
   --fc-shadow-plate: 0 3.657px 1.829px rgb(0 0 0 / 0.25);
   --fc-shadow-modal: 0 12px 12px rgb(25 25 112 / 0.08);
   --fc-shadow-cta:   0 4px 6px rgb(255 69 0 / 0.19);
-
-  /* The card front's radial fill.
-     Derived from Figma's gradientTransform
-       matrix(0.012501, 63.2, -47.4, 0.0093757, 151.87, 202.5), r=10
-     which is an ellipse of radii 474 x 632 centred on the 303.75 x 405 panel.
-     Converted here into the 272 x 381 card's own coordinates.
-     Only the first third of the ramp is on screen, which is why the card reads
-     bright blue. Do not pull the stops inward to "fix" that. */
-  --fc-card-fill: radial-gradient(174.26% 165.88% at 49.96% 46.85%,
-    #004ce5 0%, #003cc0 20%, #002c9b 40%, #00237b 55%,
-    #001a5c 70%, #00113c 85%, #00081c 100%);
 
   /* Motion. Section 12 rewrites these under prefers-reduced-motion. */
   --fc-flip-ms:     520ms;
@@ -466,56 +454,35 @@ body {
 .fc-face--back  { transform: translateZ(calc(0.5 * var(--cu))); }
 .fc-face--front { transform: rotateY(180deg) translateZ(calc(0.5 * var(--cu))); }
 
-/* --- back ---------------------------------------------------------------- */
+/* --- faces ----------------------------------------------------------------
+
+   All three faces are finished art, exported by tools/optimize.py at exactly
+   twice the 272 x 381 card, shadow cropped off, alpha kept. 100% 100% is
+   therefore distortion-free at every breakpoint, and the art's 88px corner
+   radius is the same 44 card units this element clips to. Each face's border
+   is baked into the art — nothing here draws an outline any more. */
 
 .fc-face--back {
   background-color: #0b1f6b;
-  background-image: url("../assets/img/card-back-art.svg"),
-                    url("../assets/img/card-back.webp");
-  background-repeat: no-repeat, no-repeat;
-  background-position: center, center;
-  /* Both layers are explicitly placed, exactly as in Figma. The photo sits in
-     a 365 x 488 box that overflows the 272 x 381 card; "cover" would be 28%
-     less zoomed and would not match the design. The 2px blur is baked into
-     the file, not applied here — nine CSS blur layers would re-render every
-     frame, and Safari leaks square corners through a rounded clip when a
-     blurred child is involved. */
-  background-size: calc(148.412 * var(--cu)) calc(98.941 * var(--cu)),
-                   calc(365 * var(--cu)) calc(488 * var(--cu));
+  background-image: url("../assets/img/closed_card.webp");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
-
-/* --- front --------------------------------------------------------------- */
 
 .fc-face--front {
-  background-color: #00081c;
-  background-image: var(--fc-card-fill);
-  /* Figma's 0.675px panel border falls outside the card's clip on three sides.
-     Only the bottom edge survives, as a hairline of white at 10%. */
-  box-shadow: inset 0 calc(-0.675 * var(--cu)) 0 rgb(255 255 255 / 0.1);
+  /* Under the art until it arrives: the mid blue of the face gradient. */
+  background-color: #0038b8;
+  background-image: url("../assets/img/simple_card.webp");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
-/* Figma also puts a 32.4px blur shadow on that panel. It is not reproduced,
-   and that is deliberate: the panel overhangs the card's clip on every side,
-   so an outer shadow paints entirely outside the mask and renders nothing.
-   Nine large-blur shadows drawn and immediately discarded.
-
-   The "diagonal-split-glow" and "shaded-sphere" layers are skipped for the
-   same reason. Both sit above the card's top edge inside the clipped
-   container. Confirmed against the Figma render of node 12:287, which shows a
-   plain gradient with an outline and no decoration. The exported SVGs are
-   kept in raw/img/ in case that ever changes. */
-
-.fc-face--front::before {
-  content: "";
-  position: absolute;
-  left: calc(17 * var(--cu));
-  top: calc(16 * var(--cu));
-  width: calc(237 * var(--cu));
-  height: calc(349 * var(--cu));
-  border: max(1px, calc(4 * var(--cu))) solid var(--fc-card-line);
-  border-radius: calc(44 * var(--cu));
-  /* max(1px, ...) keeps the outline from washing out: at mobile scale 4 card
-     units is 1.22px, which antialiases to grey on a 1x screen. */
+/* The 650% cards reveal the orange-outlined face. data-win-face is set at
+   build time (it mirrors data-prize, which the DOM exposes anyway), NOT at
+   flip time like data-win: matching here from the start makes the browser
+   fetch this image on load instead of mid-flip. */
+.fc-cell[data-win-face] .fc-face--front {
+  background-image: url("../assets/img/winning_card.webp");
 }
 
 .fc-prize {
