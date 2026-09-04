@@ -78,8 +78,28 @@ jobs:
           python3 -m pip install --quiet fonttools brotli
           python3 tools/fonts.py --check
 
+  # parity reads the files; this one looks at the rendered page. The class of
+  # bug it exists for is invisible to every text check: a `display: flex` that
+  # was never scoped to [open] left the CLOSED dialog in flow, so the site
+  # opened at its own footer with 650px of blank page under it, and CI was
+  # green the whole time.
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: The pages must open at the top, with nothing left in flow below the footer
+        run: |
+          python3 -m pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+          python3 tools/smoke.py
+
   build:
-    needs: parity
+    needs: [parity, smoke]
     # A pull request gets the checks above and stops there. Only main is built
     # and deployed; configure-pages and upload-pages-artifact have no business
     # running on a branch that nobody has merged yet.

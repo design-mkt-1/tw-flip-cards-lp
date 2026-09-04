@@ -70,7 +70,10 @@ body {
 .fc-root :where(input) { font: inherit; color: inherit; }
 
 /* The browser's own [hidden] rule is a bare element selector, so any class
-   here that sets display would quietly beat it. The tab panels rely on this. */
+   here that sets display would quietly beat it. The tab panels rely on this.
+   `dialog:not([open])` is the same trap in another costume, and it cannot be
+   guarded from here: a dialog's display belongs in its [open] rule and never
+   in the base one. Section 10 pays for that lesson in a comment. */
 .fc-root [hidden] { display: none !important; }
 .fc-root :where(img, svg, picture) { display: block; max-width: 100%; }
 .fc-root :where(a) { color: inherit; }
@@ -886,9 +889,15 @@ body {
    ========================================================================== */
 
 .fc-modal {
+  /* The browser's own `dialog:not([open]) { display: none }` is a bare element
+     selector, so `display: flex` here would quietly beat it and leave the
+     CLOSED dialog in normal flow: 650px of apparent emptiness under the footer,
+     and a close button that, being rendered, fires its `autofocus` and scrolls
+     the page to the bottom on load. The flex belongs to [open]. Same trap as
+     the [hidden] guard in section 1. tools/smoke.py fails on both symptoms. */
+  display: none;
   /* 504 on desktop; on mobile Figma sits the card at x=7 in the 375 frame,
      so 360 wide, not 343. */
-  display: flex;
   flex-direction: column;
   width: min(504px, calc(100vw - 15px));
   max-width: none;
@@ -911,7 +920,7 @@ body {
     display   var(--fc-modal-in) allow-discrete;
 }
 
-.fc-modal[open] { opacity: 1; transform: scale(1) translateY(0); }
+.fc-modal[open] { display: flex; opacity: 1; transform: scale(1) translateY(0); }
 
 @starting-style {
   .fc-modal[open] { opacity: 0; transform: scale(0.96) translateY(8px); }

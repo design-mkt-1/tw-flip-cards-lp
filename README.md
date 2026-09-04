@@ -9,6 +9,20 @@ Open it with any static server:
 python -m http.server 8000     # then http://127.0.0.1:8000/
 ```
 
+Two guards run on every pull request, and both run by hand too. Neither is a
+build step — the published site is these files:
+
+```
+python tools/fonts.py --check   # every character the page renders is in the fonts
+python tools/smoke.py           # the pages, in a real browser (needs Playwright)
+```
+
+`smoke.py` serves the project on a loopback port and loads all three pages at
+two viewports, asserting what no text check can see: the page opens at the top,
+nothing is left in flow below the footer, the closed dialog is `display: none`,
+the console is clean. Both guards exist because a bug shipped past everything
+else — section 7 for the fonts one, section 10 of `css/styles.css` for this one.
+
 | File         | Language  | `<html lang>` |
 |--------------|-----------|---------------|
 | `index.html` | Ukrainian | `uk`          |
