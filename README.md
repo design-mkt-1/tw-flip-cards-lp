@@ -59,8 +59,23 @@ ships as `assets/img/icons/flag-ua.svg`. Windows has no flag glyphs at all —
 Segoe UI Emoji renders 🇺🇦 as the bare letters "UA" — so the emoji the Figma
 file uses cannot be shipped as text.
 
-Marketing can change the prizes and the odds in `CONFIG.deck`, `winPrizeId`
-and `winTarget`, also at the top of `js/flip.js`.
+Marketing can change the prizes in `CONFIG.deck` and the game in
+`CONFIG.alwaysWin`, `winPrizeId` and `winTarget`, also at the top of
+`js/flip.js`.
+
+`alwaysWin` is `true`, which is what the campaign asks for: **the visitor goes
+3 of 3.** Whichever three cards they turn, all three land the top prize, and
+the third one opens the form. The prize is assigned at flip time, and the board
+locks the moment the third winner lands.
+
+The other six are dealt the losing tiers — the top prize is never dealt into
+the grid, or cards nobody turned would sit there holding it — and they open on
+a stagger once the win has landed, dimmed behind the three that won. So the
+board always finishes as exactly three top prizes over the ladder underneath.
+
+Set it to `false` for the original game: three winners hidden among nine, found
+by hunting, with `CONFIG.deck` setting the odds, and the board left as the
+visitor made it. Nothing else has to change.
 
 ---
 
@@ -343,6 +358,11 @@ These are load-bearing. Please keep them when you integrate.
    `winning` / `not_win_1` / `not_win_2`), so the top card and the form now
    promise the same 250.000 ₴ + 250FS. The ladder beneath it is 50.000 ₴ +
    150FS and 25.000 ₴ + 50FS. The card text lives in `CONFIG.deck`.
+
+   While `CONFIG.alwaysWin` is on, every card the visitor turns is promoted to
+   250.000 ₴ + 250FS. The two lower tiers are what the other six are dealt, and
+   they open dimmed at the end, so all three tiers are still drawn and the deck
+   stays the one place the card text lives.
 
    That redraw shipped a bug with it, fixed on 2026-09-04: the hryvnia sign
    was in none of the fonts, so it rendered in a system fallback — thin and

@@ -82,12 +82,27 @@
     /* ── Game. Marketing can tune these. ─────────────────────────────── */
 
     winPrizeId: 'p250k',     // the prize the visitor is hunting for
-    winTarget:  3,           // how many of them are hidden in the grid
+    winTarget:  3,           // how many of them the visitor has to turn
 
-    /* Nine cards: three of each prize. Change the counts to change the odds.
-       They must add up to nine. The three tiers are the card variants the
-       design draws — winning / not_win_1 / not_win_2 (Figma 12:287, 29:584,
-       29:592) — which is why the top card matches the dialog's offer. */
+    /* The visitor goes 3 of 3: every card they turn lands the top prize, so
+       there is no miss and no hunt. It is what the campaign asks for — a
+       short, certain path to the form — not an accident of the deck.
+
+       The prize is assigned at flip time, in promote(), rather than at build
+       time. The six they never turn are dealt the losing tiers and open at
+       the end, dimmed, so the board finishes showing exactly three top prizes
+       with the ladder they were playing against behind them.
+
+       Set this to false for the original game, where three winners are hidden
+       among nine and the deck below sets the odds. */
+    alwaysWin: true,
+
+    /* Nine cards: three of each prize. They must add up to nine. The counts
+       set the odds only when alwaysWin is false; while it is true the deck is
+       just where the card text and the six unseen losing faces come from.
+       The three tiers are the card variants the design draws — winning /
+       not_win_1 / not_win_2 (Figma 12:287, 29:584, 29:592) — which is why the
+       top card matches the dialog's offer. */
     deck: [
       { id: 'p250k', pct: '250.000 ₴', fs: '250' },
       { id: 'p250k', pct: '250.000 ₴', fs: '250' },
@@ -286,19 +301,63 @@
     return li;
   }
 
+  /* What the nine cards are built as.
+
+     Under alwaysWin the deck's own top-prize entries are never dealt. The
+     three cards that win are the three the visitor turns, and promote() writes
+     the prize onto them — so if a top-prize card were also lying in the grid
+     unturned, the board would end showing six of them. Dealing only the losing
+     tiers is what leaves exactly three at the end: the visitor's, with the
+     ladder they were playing against behind them.
+
+     The deck stays the single source of the card text either way. */
+  function dealtDeck() {
+    var deck = CONFIG.deck;
+    if (!CONFIG.alwaysWin) return shuffle(deck.slice());
+
+    /* One entry per losing TIER, not per losing card. Dealt round robin, so
+       nine cards come out as evenly as two tiers divide — five and four.
+       Cycling the six losing cards instead would deal six of the first tier
+       and three of the second, which reads as a lopsided ladder. */
+    var tiers = [];
+    var seen = {};
+    for (var i = 0; i < deck.length; i++) {
+      if (deck[i].id === CONFIG.winPrizeId) continue;
+      if (seen[deck[i].id]) continue;
+      seen[deck[i].id] = true;
+      tiers.push(deck[i]);
+    }
+    /* A deck of nothing but top prizes: nothing to deal, fall back rather
+       than hand back an empty grid. */
+    if (!tiers.length) return shuffle(deck.slice());
+
+    var hand = [];
+    for (var j = 0; j < deck.length; j++) hand.push(tiers[j % tiers.length]);
+    return shuffle(hand);
+  }
+
   function buildGrid() {
-    var prizes = shuffle(CONFIG.deck.slice());
+    var prizes = dealtDeck();
     var frag = document.createDocumentFragment();
     var winIndex = 0;
 
     for (var i = 0; i < prizes.length; i++) {
       var cell = buildCard(prizes[i], i);
-      if (prizes[i].id === CONFIG.winPrizeId) {
+
+      /* The orange-outlined face art, applied from styles.css. Set at build
+         time rather than at flip time so the image is fetched with the page,
+         not in the middle of the first winning flip. */
+      if (CONFIG.alwaysWin) {
+        /* These three are not the winners — under alwaysWin the winners are
+           whichever three get turned. They carry the attribute so that BOTH
+           faces are fetched at load: three ask for winning_card.webp and six
+           for simple_card.webp, and by the time either is needed it is cached.
+           promote() moves it onto the cards actually turned, revealRest()
+           takes it off these. */
+        if (i < CONFIG.winTarget) cell.dataset.winFace = '';
+      } else if (prizes[i].id === CONFIG.winPrizeId) {
         /* Drives the 80ms stagger of the marking sweep, in DOM order. */
         cell.style.setProperty('--i', String(winIndex++));
-        /* The orange-outlined face art, applied from styles.css. Set here at
-           build time rather than at flip time so the image is fetched with
-           the page, not in the middle of the first winning flip. */
         cell.dataset.winFace = '';
       }
       frag.appendChild(cell);
@@ -322,10 +381,74 @@
     });
   }
 
+  /* The top prize, read out of the deck rather than written down a second
+     time. tools/fonts.py --check builds the card subset by parsing CONFIG.deck
+     with a regex, so a prize string that lives anywhere else is a prize string
+     whose glyphs nobody guarantees. That is exactly how the hryvnia sign
+     shipped in no font at all. */
+  function topPrize() {
+    for (var i = 0; i < CONFIG.deck.length; i++) {
+      if (CONFIG.deck[i].id === CONFIG.winPrizeId) return CONFIG.deck[i];
+    }
+    return CONFIG.deck[0];
+  }
+
+  /* alwaysWin: the card the visitor just turned becomes the top prize. Only
+     what they actually see is rewritten — the six they never turn keep the
+     losing tiers they were built with. */
+  function promote(cell) {
+    var prize = topPrize();
+    var pct = cell.querySelector('.fc-prize__pct');
+    var fs  = cell.querySelector('.fc-prize__fs');
+
+    cell.dataset.prize = prize.id;
+    /* The orange-outlined art has to travel with the text, or the card draws
+       a plain face over the top prize. buildGrid put it on three cards to get
+       the image fetched at load; this is where it lands on the right ones. */
+    cell.dataset.winFace = '';
+    if (pct) pct.textContent = prize.pct;
+    if (fs)  fs.textContent  = prize.fs + t('fsLabel');
+  }
+
+  /* The cards the visitor never turned open too, once the win has landed, so
+     the ladder they were playing against is visible behind the three that won.
+     They are NOT promoted: they show the losing tiers the deck built them as,
+     which is also why data-win-face has to come off any that were carrying it
+     for the preload — a 50.000 card must not draw the top prize's frame. */
+  function revealRest() {
+    var rest = grid.querySelectorAll('.fc-cell:not([data-win])');
+    var T = timing();
+
+    for (var i = 0; i < rest.length; i++) {
+      (function (cell, order) {
+        if (cell.dataset.face === 'front') return;
+        window.setTimeout(function () {
+          var btn = cell.querySelector('.fc-card');
+          delete cell.dataset.winFace;
+          cell.dataset.face = 'front';
+          if (btn) btn.setAttribute('aria-pressed', 'true');
+          setLabel(cell, 'cardFront');
+        }, order * Math.round(T.flip / 8));
+      }(rest[i], i));
+    }
+  }
+
   function flipCard(cell) {
     var T = timing();
-    var isWin = cell.dataset.prize === CONFIG.winPrizeId;
     var btn = cell.querySelector('.fc-card');
+
+    if (CONFIG.alwaysWin) {
+      /* Before anything reads dataset.prize: isWin below, and setLabel, which
+         speaks the prize out loud to a screen reader. */
+      promote(cell);
+      /* Stagger in the order they were turned, not in DOM order. Two rules
+         read --i and both assume 0, 1, 2: the 80ms marking sweep and the
+         phase offset of the breathe loop. Set before the flip attributes, so
+         the value is in place when those transitions start. */
+      cell.style.setProperty('--i', String(state.found));
+    }
+
+    var isWin = cell.dataset.prize === CONFIG.winPrizeId;
 
     /* Lock the board before the last winning flip starts, so a fast clicker
        cannot turn a tenth card while the win sequence runs. */
@@ -380,6 +503,11 @@
     window.setTimeout(function () {
       grid.dataset.phase = 'reveal';
       if (claim) claim.setAttribute('data-on', '');
+      /* Only under alwaysWin. With the switch off this is the original game,
+         where the visitor turned losers on the way and the board they end on
+         is the board they made — leaving it alone is what keeps "false"
+         a true restore rather than a third, half-new game. */
+      if (CONFIG.alwaysWin) revealRest();
     }, T.flip + T.hold);
 
     window.setTimeout(openModal, T.flip + T.hold + T.reveal);
