@@ -56,9 +56,9 @@
     siteUrl:    '',
 
     /* What the platform is told the visitor was promised. It travels on the
-       payload as `bonus`. The cards run a 650 / 250 / 100 percent ladder;
-       the offer in the dialog is the welcome bonus, which is a different
-       thing — so this is a string you set, not one derived from the deck. */
+       payload as `bonus`. Since the cards were redrawn in hryvnia the top
+       card and the dialog now promise the same thing, but this stays a string
+       you set rather than one derived from the deck. */
     bonusCode:  '250000+250',
 
     /* Demo switch, and only that. It can only ever fire on the route where
@@ -81,25 +81,27 @@
 
     /* ── Game. Marketing can tune these. ─────────────────────────────── */
 
-    winPrizeId: 'p650',      // the prize the visitor is hunting for
+    winPrizeId: 'p250k',     // the prize the visitor is hunting for
     winTarget:  3,           // how many of them are hidden in the grid
 
     /* Nine cards: three of each prize. Change the counts to change the odds.
-       They must add up to nine. */
+       They must add up to nine. The three tiers are the card variants the
+       design draws — winning / not_win_1 / not_win_2 (Figma 12:287, 29:584,
+       29:592) — which is why the top card matches the dialog's offer. */
     deck: [
-      { id: 'p650', pct: '650%', fs: '250' },
-      { id: 'p650', pct: '650%', fs: '250' },
-      { id: 'p650', pct: '650%', fs: '250' },
-      { id: 'p250', pct: '250%', fs: '50'  },
-      { id: 'p250', pct: '250%', fs: '50'  },
-      { id: 'p250', pct: '250%', fs: '50'  },
-      { id: 'p100', pct: '100%', fs: '10'  },
-      { id: 'p100', pct: '100%', fs: '10'  },
-      { id: 'p100', pct: '100%', fs: '10'  }
+      { id: 'p250k', pct: '250.000 ₴', fs: '250' },
+      { id: 'p250k', pct: '250.000 ₴', fs: '250' },
+      { id: 'p250k', pct: '250.000 ₴', fs: '250' },
+      { id: 'p50k',  pct: '50.000 ₴',  fs: '150' },
+      { id: 'p50k',  pct: '50.000 ₴',  fs: '150' },
+      { id: 'p50k',  pct: '50.000 ₴',  fs: '150' },
+      { id: 'p25k',  pct: '25.000 ₴',  fs: '50'  },
+      { id: 'p25k',  pct: '25.000 ₴',  fs: '50'  },
+      { id: 'p25k',  pct: '25.000 ₴',  fs: '50'  }
     ],
 
-    /* A card that is not a 650% stays face up. Everyone reaches the form,
-       which is the point of a campaign page. Set this to a number of
+    /* A card that is not the top prize stays face up. Everyone reaches the
+       form, which is the point of a campaign page. Set this to a number of
        milliseconds if you want wrong cards to turn back over instead. */
     flipBackMs: 0,
 
@@ -114,14 +116,16 @@
 
   var MESSAGES = {
     uk: {
-      fsLabel:    'ФС',
+      /* Latin FS, not ФС: the Ukrainian artboards write it that way on both
+         the cards and the dialog's offer block. */
+      fsLabel:    'FS',
       cardBack:   'Картка {n} з 9, сорочкою вгору. Натисніть, щоб перевернути.',
       cardFront:  'Картка {n}: {prize}.',
       cardWin:    'Картка {n}: {prize}. Знайдено!',
-      p650: '650 відсотків плюс 250 фріспінів',
-      p250: '250 відсотків плюс 50 фріспінів',
-      p100: '100 відсотків плюс 10 фріспінів',
-      progress:   'Знайдено {n} з 3 карток з бонусом 650 відсотків',
+      p250k: '250 тисяч гривень плюс 250 фріспінів',
+      p50k:  '50 тисяч гривень плюс 150 фріспінів',
+      p25k:  '25 тисяч гривень плюс 50 фріспінів',
+      progress:   'Знайдено {n} з 3 карток із головним призом',
       win:        'Знайдено всі три картки. Відкриваємо форму реєстрації.',
       errPhone:   'Введіть 9 цифр номера',
       errEmail:   'Введіть коректну адресу email',
@@ -132,14 +136,14 @@
       hidePass:   'Сховати пароль'
     },
     ru: {
-      fsLabel:    'ФС',
+      fsLabel:    'FS',
       cardBack:   'Карта {n} из 9, рубашкой вверх. Нажмите, чтобы перевернуть.',
       cardFront:  'Карта {n}: {prize}.',
       cardWin:    'Карта {n}: {prize}. Найдено!',
-      p650: '650 процентов плюс 250 фриспинов',
-      p250: '250 процентов плюс 50 фриспинов',
-      p100: '100 процентов плюс 10 фриспинов',
-      progress:   'Найдено {n} из 3 карт с бонусом 650 процентов',
+      p250k: '250 тысяч гривен плюс 250 фриспинов',
+      p50k:  '50 тысяч гривен плюс 150 фриспинов',
+      p25k:  '25 тысяч гривен плюс 50 фриспинов',
+      progress:   'Найдено {n} из 3 карт с главным призом',
       win:        'Найдены все три карты. Открываем форму регистрации.',
       errPhone:   'Введите 9 цифр номера',
       errEmail:   'Введите корректный адрес email',
@@ -154,10 +158,10 @@
       cardBack:   'Card {n} of 9, face down. Press to flip.',
       cardFront:  'Card {n}: {prize}.',
       cardWin:    'Card {n}: {prize}. Found!',
-      p650: '650 percent plus 250 free spins',
-      p250: '250 percent plus 50 free spins',
-      p100: '100 percent plus 10 free spins',
-      progress:   'Found {n} of 3 cards with the 650 percent bonus',
+      p250k: '250 thousand hryvnia plus 250 free spins',
+      p50k:  '50 thousand hryvnia plus 150 free spins',
+      p25k:  '25 thousand hryvnia plus 50 free spins',
+      progress:   'Found {n} of 3 cards with the top prize',
       win:        'All three cards found. Opening the registration form.',
       errPhone:   'Enter the 9 digits of your number',
       errEmail:   'Enter a valid email address',
@@ -261,7 +265,8 @@
       '<span class="fc-prize__plus">+</span>' +
       '<span class="fc-prize__fs"></span>';
     box.firstChild.textContent = prize.pct;
-    box.lastChild.textContent = prize.fs + ' ' + t('fsLabel');
+    /* No separator: the design sets it solid, "250FS". */
+    box.lastChild.textContent = prize.fs + t('fsLabel');
     front.appendChild(box);
 
     flip.appendChild(back);

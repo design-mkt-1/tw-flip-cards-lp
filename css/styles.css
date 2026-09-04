@@ -453,7 +453,7 @@ body {
   background-size: 100% 100%;
 }
 
-/* The 650% cards reveal the orange-outlined face. data-win-face is set at
+/* The top-prize cards reveal the orange-outlined face. data-win-face is set at
    build time (it mirrors data-prize, which the DOM exposes anyway), NOT at
    flip time like data-win: matching here from the start makes the browser
    fetch this image on load instead of mid-flip. */
@@ -461,15 +461,25 @@ body {
   background-image: url("../assets/img/winning_card.webp");
 }
 
+/* Three lines, 222 x 135 at y=122.5 in the 380-tall card (Figma 12:293), the
+   geometry the hryvnia redraw brought with it.
+
+   The redesign also sets these upright (Roboto Black, not Black Italic), but
+   the only display face this page ships is italic — both @font-face rules for
+   "Roboto Flex" declare font-style: italic and there is no upright woff2 in
+   assets/fonts. Asking for normal here would change nothing on screen, so the
+   declaration stays honest and the deviation is recorded instead. Going
+   upright means shipping an upright Roboto subset. */
 .fc-prize {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(105 * var(--cu));
-  height: calc(148 * var(--cu));
+  top: calc(122.5 * var(--cu));
+  height: calc(135 * var(--cu));
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: calc(18 * var(--cu));
   font-family: var(--fc-display);
   font-weight: 900;
   font-style: italic;
@@ -477,16 +487,15 @@ body {
   text-transform: uppercase;
   text-align: center;
   color: #fff;
-  /* Absolute, not unitless: the three lines have three different font sizes
-     and the design gives them one shared leading. The 71.58 cap height
-     overflows this line box on purpose, so never clip this element. */
-  line-height: calc(47.243 * var(--cu));
+  white-space: nowrap;
   font-synthesis: none;
 }
 
-.fc-prize__pct  { font-size: calc(71.581 * var(--cu)); }
-.fc-prize__plus { font-size: calc(44 * var(--cu)); }
-.fc-prize__fs   { font-size: calc(53.686 * var(--cu)); }
+/* Line boxes are the cap heights Figma trims to (34 / 31 / 34), not the type
+   size — the glyphs overhang on purpose, so never clip this element. */
+.fc-prize__pct  { font-size: calc(48 * var(--cu)); line-height: calc(34 * var(--cu)); }
+.fc-prize__plus { font-size: calc(44 * var(--cu)); line-height: calc(31 * var(--cu)); }
+.fc-prize__fs   { font-size: calc(48 * var(--cu)); line-height: calc(34 * var(--cu)); }
 
 /* --- states -------------------------------------------------------------- */
 

@@ -18,12 +18,10 @@ python -m http.server 8000     # then http://127.0.0.1:8000/
 The three files are structurally identical. Only the text differs. Mount them
 wherever your routing expects, for example `/ua/`, `/ru/` and `/en/`.
 
-**The game:** nine cards face down, three of them hide the 650% + 250 FS
-card. The visitor flips cards to find those three. When the third one turns
-up, the registration form opens, offering the welcome bonus — 250000 UAH +
-250 free spins. The cards are the game's own 650 / 250 / 100 percent ladder;
-the welcome bonus in the form is a separate offer, and it is the one the
-platform pays out.
+**The game:** nine cards face down, three of them hide the 250.000 ₴ + 250FS
+top prize. The visitor flips cards to find those three. When the third one
+turns up, the registration form opens, offering the same welcome bonus. The
+other six cards run a 50.000 ₴ + 150FS / 25.000 ₴ + 50FS ladder beneath it.
 
 ---
 
@@ -304,16 +302,19 @@ These are load-bearing. Please keep them when you integrate.
 2. Figma styles the two consent links green only in the Ukrainian version, and
    sets the copyright line in bold only in the Russian one. Both were
    normalised across all three languages.
-3. **The cards and the form now promise different things.** The nine cards run
-   a 650 / 250 / 100 percent ladder; the form offers 250000 UAH + 250 FS. That
-   is what the two Figma sections draw, and it reads as a funnel — but a
-   visitor who hunts for "650%" and is then shown a hryvnia figure may not
-   join the two up. The card text lives in `CONFIG.deck`.
+3. ~~**The cards and the form now promise different things.**~~ **Resolved
+   2026-09-04.** The design team redrew the cards in hryvnia (Figma variants
+   `winning` / `not_win_1` / `not_win_2`), so the top card and the form now
+   promise the same 250.000 ₴ + 250FS. The ladder beneath it is 50.000 ₴ +
+   150FS and 25.000 ₴ + 50FS. The card text lives in `CONFIG.deck`.
 4. **The registration form is only drawn in Ukrainian** (`19:2017`); only the
    footer has all three languages. The Russian and English strings in the form
    and on the confirmation screen were translated here and should be read by
-   someone who owns the copy. The amount is written `250000 ГРН` on the
-   Ukrainian and Russian pages and `250000 UAH` on the English one.
+   someone who owns the copy. The amount is now written `250.000 ₴` on all
+   three pages: Figma spelled it `250000 ГРН` in the dialog and `250.000 ₴` on
+   the cards, and the owner picked the card notation for both (2026-09-04).
+   Free spins are `FS` in every language for the same reason — the Ukrainian
+   artboards use the Latin form on both surfaces.
 5. **The popup node has no close button.** One was kept: Escape is not a
    discoverable dismissal on a touch device, and with the card filling a
    phone screen there is almost no backdrop left to tap.

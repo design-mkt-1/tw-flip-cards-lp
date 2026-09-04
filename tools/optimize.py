@@ -196,8 +196,8 @@ def build_card_faces() -> None:
     twice the 272x381 card of the design:
 
         closed_card.png   the back everyone sees first (TW logo, coins)
-        simple_card.png   the revealed face of a 100% / 250% card
-        winning_card.png  the revealed face of a 650% card (orange outline)
+        simple_card.png   the revealed face of a lower-tier card (white outline)
+        winning_card.png  the revealed face of a top-prize card (orange outline)
 
     Each 640x858 export carries its own baked drop shadow around a 544x762
     card body at (48, 40). The shadow is cropped away, NOT kept: the page
