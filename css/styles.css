@@ -213,11 +213,26 @@ body {
   --fc-orange:      #ff4500;
   --fc-navy:        #191970;
 
+  /* The brand orange, one step down the same ramp, for the two places it has
+     to carry contrast rather than just be seen. White on #ff4500 measures
+     3.39 and orange-as-14px-text on white measures 3.44; both are small text
+     and both fail 1.4.3. This measures 4.63 either way.
+
+     --fc-orange itself is untouched and stays the fill and the accent — it
+     still carries .fc-offer__amount, which at 50px is large text and passes
+     at 3.44 against a 3.0 threshold. Same split as --fc-err/--fc-err-txt. */
+  --fc-orange-deep: #d93900;
+
   /* Sampled from the design */
   --fc-gold:        #ffd900;
   --fc-navy-deep:   #00002e;
   --fc-navy-ink:    #171671;
-  --fc-muted:       #737b8c;
+  /* Was #737b8c, the sampled value. It measures 4.25 on white and 3.86 on
+     --fc-field-bg and fails 1.4.3 in both places — the tabs, the field
+     labels, the consent sentence, "already have an account" and the
+     credential keys are all small text. One step darker on the same grey:
+     5.19 on white, 4.70 on the field. Indistinguishable at 13px. */
+  --fc-muted:       #656d7e;
   --fc-footer-txt:  #9ca3af;
   --fc-border:      #e7e6e9;
   --fc-field-bg:    #f3f4f5;
@@ -231,7 +246,9 @@ body {
      1.4.3; this is the next step down the same Material red ramp and
      measures 5.07. Indistinguishable at 12px, and legible. */
   --fc-err-txt:     #c62828;
-  --fc-link:        #00a75c;
+  /* Was #00a75c: 3.14 on white, the worst contrast on the page, and it
+     carries the two consent links at 13px. Darkened to 4.60. */
+  --fc-link:        #00874a;
   --fc-ink:         #2a2a2a;
 
   /* Type.
@@ -1270,7 +1287,7 @@ body {
   width: 100%;
   height: 48px;
   padding: 12px 24px;
-  background: var(--fc-orange);
+  background: var(--fc-orange-deep);   /* white on it: see the token */
   border-radius: 10px;
   box-shadow: var(--fc-shadow-cta);
   color: #fff;
@@ -1287,7 +1304,7 @@ body {
 .fc-submit:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 3px; }
 
 .fc-signin { font-size: 14px; font-weight: 500; color: var(--fc-muted); }
-.fc-signin a { color: var(--fc-orange); font-weight: 700; text-decoration: none; }
+.fc-signin a { color: var(--fc-orange-deep); font-weight: 700; text-decoration: none; }
 .fc-signin a:hover { text-decoration: underline; }
 
 /* --- the confirmation screen -------------------------------------------- */
@@ -1382,7 +1399,7 @@ body {
   display: none;
   margin: calc(18 * var(--u)) auto 0;
   padding: calc(11 * var(--u)) calc(22 * var(--u));
-  background: var(--fc-orange);
+  background: var(--fc-orange-deep);   /* white on it: see the token */
   border-radius: calc(10 * var(--u));
   box-shadow: var(--fc-shadow-cta);
   color: #fff;
