@@ -81,6 +81,15 @@ visitor made it. Nothing else has to change.
 
 ## 2. Wiring the form — pick one route
 
+> **Before you wire it: there is a Content-Security-Policy `<meta>` in the head
+> of all three pages.** It deliberately omits `form-action`, so route A can POST
+> to any host today and nothing has to change. If you ever add `form-action` to
+> that policy, add your endpoint's origin with it — and if you point the form at
+> a **different origin** while route B is in use, `connect-src` needs that origin
+> too, because `default-src 'self'` covers `fetch`/`XHR`. A CSP refusal appears
+> **only in the browser console**: the submit will look like it simply did
+> nothing.
+
 **A. Plain HTML.** Set `action` and `method` on `<form id="fc-form">` in all
 three files. The script validates the fields, then gets out of the way and the
 browser submits the form normally. No JavaScript changes at all.
