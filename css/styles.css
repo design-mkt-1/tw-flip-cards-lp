@@ -513,9 +513,14 @@ body {
 }
 
 /* The top-prize cards reveal the orange-outlined face. data-win-face is set at
-   build time (it mirrors data-prize, which the DOM exposes anyway), NOT at
-   flip time like data-win: matching here from the start makes the browser
-   fetch this image on load instead of mid-flip. */
+   build time, NOT at flip time like data-win: matching here from the start
+   makes the browser fetch this image on load instead of mid-flip.
+
+   Under CONFIG.alwaysWin it no longer mirrors data-prize at build time: three
+   cards carry it so both face images are fetched with the page, and then it
+   MOVES — promote() puts it on each card the visitor turns, revealRest() takes
+   it off the ones they did not. It has to move. Left alone, a 50.000 card
+   would open drawing the top prize's orange frame. */
 .fc-cell[data-win-face] .fc-face--front {
   background-image: url("../assets/img/winning_card.webp");
 }
