@@ -32,10 +32,15 @@ else — section 7 for the fonts one, section 10 of `css/styles.css` for this on
 The three files are structurally identical. Only the text differs. Mount them
 wherever your routing expects, for example `/ua/`, `/ru/` and `/en/`.
 
-**The game:** nine cards face down, three of them hide the 250.000 ₴ + 250FS
-top prize. The visitor flips cards to find those three. When the third one
-turns up, the registration form opens, offering the same welcome bonus. The
-other six cards run a 50.000 ₴ + 150FS / 25.000 ₴ + 50FS ladder beneath it.
+**The game:** nine cards face down. **The visitor goes 3 of 3** — whichever
+three cards they turn, all three land the 250.000 ₴ + 250FS top prize. There
+is no miss and nothing to hunt for. When the third one turns, the board locks
+and the registration form opens, offering the same welcome bonus, and the six
+cards nobody turned open behind it showing the 50.000 ₴ + 150FS / 25.000 ₴ +
+50FS ladder they were played against.
+
+That is `CONFIG.alwaysWin`, and it is what the campaign asks for. Section 1
+covers turning it off.
 
 ---
 
@@ -53,6 +58,17 @@ Everything in rows 1 to 3 sits inside one commented block at the top of
 | 5 | Where the confirmation screen's button goes | `CONFIG.siteUrl`                                 |
 | 6 | What the platform is told the bonus was | `CONFIG.bonusCode` — travels as `bonus` on the payload |
 | 7 | Logo click target             | wrap `.fc-plate img` in an `<a>` in each HTML file                     |
+
+**Rows 1 and 3 block go-live. The rest do not.**
+
+Until row 1 is done the form sends nothing at all: it validates, then writes
+the payload to the browser console and stops. There is no error and no
+message — to a visitor it looks like a completed registration that quietly
+went nowhere. Until row 3 is done, Terms and Privacy are `href="#"` and go
+nowhere, which on a page that collects a date-of-birth consent is a
+compliance problem, not a cosmetic one.
+
+Rows 2, 4, 5, 6 and 7 all have working defaults and can follow later.
 
 `CONFIG.dialFlag` takes either an emoji or a path to an 18 x 18 image, and
 ships as `assets/img/icons/flag-ua.svg`. Windows has no flag glyphs at all —
@@ -170,10 +186,10 @@ still gets it.
   hand it and nothing else; with nothing wired it never opens.
 - **Game state is not persisted.** Reloading restarts the game. That is
   deliberate for a campaign page.
-- **Every card can be flipped.** A visitor who turns all nine always finds the
-  three winners and reaches the form. That is the point of a funnel page. Set
-  `CONFIG.flipBackMs` to a number of milliseconds if you want wrong cards to
-  turn back over instead.
+- **Nobody can lose, and nobody turns more than three.** The board locks the
+  moment the third card lands, so everyone reaches the form in exactly three
+  clicks. That is the point of a funnel page. `CONFIG.flipBackMs` only matters
+  with `alwaysWin` off, where wrong cards exist and stay face up by default.
 
 ---
 
@@ -332,7 +348,7 @@ These are load-bearing. Please keep them when you integrate.
   accessible name comes from a visually hidden span that the script rewrites
   on each flip. Without that, a screen reader reads the prize off a card that
   is still face down and the game is over before the first click.
-- `#fc-status` is a live region that announces progress as cards are found.
+- `#fc-status` is a live region that announces progress as cards are turned.
 - Validation errors use `role="alert"` **and** move focus to the first bad
   field. Both are needed: the first announces, the second locates.
 - The password field is `autocomplete="new-password"`, not
