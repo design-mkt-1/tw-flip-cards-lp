@@ -10,6 +10,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,14 +20,23 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Per ref, so a pull request cannot queue behind a deploy of main, and two
+  # open pull requests do not serialise against each other.
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  # The checks run on pull requests as well as pushes. They used to live inside
+  # build, which only ran after a merge, so every guard here reported a problem
+  # that was already on main. The hryvnia font bug reached production that way.
+  parity:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: The three language files must stay structurally identical
         run: |
@@ -58,6 +69,24 @@ jobs:
                       % (f, i, a[i], f, b[i], f))
           print('tag sequences match: %d tags' % len(a))
           PY
+
+      # Roboto has no hryvnia sign. Nobody noticed when the cards were redrawn
+      # in hryvnia, because a missing glyph still renders in a fallback face.
+      # This is the check that would have caught it.
+      - name: Every character the page renders must exist in the shipped fonts
+        run: |
+          python3 -m pip install --quiet fonttools brotli
+          python3 tools/fonts.py --check
+
+  build:
+    needs: parity
+    # A pull request gets the checks above and stops there. Only main is built
+    # and deployed; configure-pages and upload-pages-artifact have no business
+    # running on a branch that nobody has merged yet.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Stage the served files
         run: |

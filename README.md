@@ -231,7 +231,29 @@ python tools/optimize.py
 | Hero, mobile     | AVIF 375                | 4 KB   |
 | Card back        | WebP, blur baked in     | 6 KB   |
 | Icons and logo   | SVG                     | ~20 KB |
-| Fonts            | 4 WOFF2 subsets         | 117 KB |
+| Fonts            | 7 WOFF2 subsets         | 126 KB |
+
+**Fonts have their own script**, `tools/fonts.py`, and `assets/fonts/` should
+never be edited by hand:
+
+```
+python -m pip install --upgrade "fonttools[woff]"
+python tools/fonts.py           # rebuild
+python tools/fonts.py --check   # verify coverage, no network
+```
+
+Four of the seven files are Google Fonts subsets carried through verbatim, so
+a rebuild reproduces them byte for byte. Three are cut tight: the upright face
+for the prize lines on a card, and one hryvnia glyph per style.
+
+**The hryvnia sign is not Roboto.** Roboto has no `₴` at any weight, width or
+release — the Google Fonts API even advertises `U+20B4` in the unicode-range it
+serves for Roboto's `cyrillic-ext` subset, but the file behind that range does
+not contain the glyph. Figma cannot draw it either, so the artboards show a
+fallback and are no reference for it. It comes from Noto Sans Black, Google's
+companion family to Roboto: cap height 714/1000 against Roboto's 1456/2048, a
+difference of 0.4%. If the copy ever changes, run `--check` — it is wired into
+CI and fails on any character the shipped faces cannot render.
 
 Three icons are not straight Figma exports:
 
@@ -307,6 +329,14 @@ These are load-bearing. Please keep them when you integrate.
    `winning` / `not_win_1` / `not_win_2`), so the top card and the form now
    promise the same 250.000 ₴ + 250FS. The ladder beneath it is 50.000 ₴ +
    150FS and 25.000 ₴ + 50FS. The card text lives in `CONFIG.deck`.
+
+   That redraw shipped a bug with it, fixed on 2026-09-04: the hryvnia sign
+   was in none of the fonts, so it rendered in a system fallback — thin and
+   narrow beside black italic digits, on all nine cards and in the dialog, in
+   all three languages. Nothing failed, because a missing glyph still draws
+   *something*. Section 7 explains where the sign now comes from, and
+   `tools/fonts.py --check` runs on every pull request so a copy change cannot
+   do this again.
 4. **The registration form is only drawn in Ukrainian** (`19:2017`); only the
    footer has all three languages. The Russian and English strings in the form
    and on the confirmation screen were translated here and should be read by
