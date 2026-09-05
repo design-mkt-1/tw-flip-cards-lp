@@ -179,6 +179,6 @@ with the exact commands. Follow it; these eight steps are the map.
 - `superpowers:test-driven-development` — no framework, no `package.json`, no
   runner. Verification is the four guards in `tools/`.
 
-TEMPLATE-REV: v1.0.2 — before starting, compare this against the template's
+TEMPLATE-REV: v1.0.3 — before starting, compare this against the template's
 HEAD tag; if they differ, read the template's diff before trusting any path or
 value quoted here.

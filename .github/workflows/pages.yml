@@ -77,6 +77,13 @@ jobs:
         run: |
           mkdir -p _site
           cp -r index.html campaign.js .nojekyll css js campaign assets _site/
+          # campaign/ is on the allowlist because the mechanic lives there, and
+          # it also holds the campaign's own Playwright check and whatever
+          # Python left beside it. Neither is served, and campaign/smoke.py
+          # published on the live URL is the same mistake as tools/ being
+          # published -- it just arrived through a directory that IS wanted.
+          rm -f _site/campaign/smoke.py
+          find _site -name '__pycache__' -type d -prune -exec rm -rf {} +
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

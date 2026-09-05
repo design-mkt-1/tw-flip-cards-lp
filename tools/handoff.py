@@ -32,6 +32,14 @@ WORKFLOW = ROOT / ".github" / "workflows" / "pages.yml"
 # if someone ever writes `cp -r . _site/`, this is what still refuses.
 NEVER = ("tools", "docs", "raw", ".git", ".github", ".claude")
 
+# Dev files that live INSIDE a directory the allowlist wants. campaign/ is
+# staged because the mechanic is there, and the campaign's own Playwright check
+# sits beside it -- served, it is the same mistake as publishing tools/, and it
+# arrives through a door that is supposed to be open. .github/workflows/pages.yml
+# deletes the same two after its copy.
+SKIP_FILES = ("campaign/smoke.py",)
+SKIP_DIRS = ("__pycache__",)
+
 
 def allowlist():
     """The paths the Pages build stages, read out of the workflow."""
@@ -169,10 +177,13 @@ def main() -> int:
                 staged.append(entry)
             else:
                 for f in sorted(path.rglob("*")):
-                    if f.is_file():
-                        rel = f.relative_to(ROOT).as_posix()
-                        z.write(f, rel)
-                        staged.append(rel)
+                    if not f.is_file():
+                        continue
+                    rel = f.relative_to(ROOT).as_posix()
+                    if rel in SKIP_FILES or any(d in f.parts for d in SKIP_DIRS):
+                        continue
+                    z.write(f, rel)
+                    staged.append(rel)
         z.writestr("README-IT.md", readme)
         staged.append("README-IT.md")
 
@@ -181,7 +192,8 @@ def main() -> int:
     with zipfile.ZipFile(zip_path) as z:
         names = z.namelist()
     assert "index.html" in names, "handoff: the archive has no index.html"
-    leaked = [n for n in names if n.split("/")[0] in NEVER]
+    leaked = [n for n in names if n.split("/")[0] in NEVER
+              or n in SKIP_FILES or any(d in n.split("/") for d in SKIP_DIRS)]
     assert not leaked, "handoff: the archive contains " + ", ".join(leaked)
 
     size = zip_path.stat().st_size
