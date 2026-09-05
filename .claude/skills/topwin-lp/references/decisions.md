@@ -97,13 +97,16 @@ of the apostrophe.
 
 ---
 
-## 4. Layout — the three modes
+## 4. Layout — the four modes
 
 **DECISION** The shell has no opinion about the page box: `css/shell.css` is
 px, rem and `clamp()` of a viewport width, with no `vh`, `cqh`, `cqw` or `--u`
 anywhere. The campaign picks mode A (scrolling page, the default and nothing to
 do), B (the `css/stage.css` `<link>`, a fixed stage that never scrolls) or C
-(an artboard `--u` unit, for the mechanic only).
+(an artboard `--u` unit, for the mechanic only). Mode **B2**, added in v1.0.2,
+is the `css/fold.css` `<link>`: `#tw-main` is a definite box `92svh` minus the
+header, the page scrolls, and the footer starts below the fold with only its
+top edge showing.
 
 **WHY** Those units are exactly what welded the two previous landings to their
 own layouts — one page's header lived inside a container query on `#stage` and
@@ -123,8 +126,21 @@ Also rejected: canvas sizing in the shell. A drawing buffer cannot be set from
 CSS and the canvas belongs to the mechanic, so it lives in `campaign/main.js`.
 There is no `js/stage.js`; do not go looking for one.
 
-`css/stage.css` is the only stylesheet allowed to position the page. Two files
-with an opinion about the page box is how a shell stops being reusable.
+`css/stage.css` and `css/fold.css` are the only stylesheets allowed to position
+the page, and a campaign links AT MOST ONE of them. Two files with an opinion
+about the page box is how a shell stops being reusable — which is also why the
+fold is its own file rather than a class inside `css/stage.css`: one file, one
+page shape, and a campaign that has picked neither still gets an ordinary
+scrolling page.
+
+`css/fold.css` is allowed `svh` where the shell is not, for the same reason
+`css/stage.css` is allowed `position: fixed`: being the page box is its whole
+job. `svh` and not `dvh` — the small viewport is stable, and it is the one that
+cannot hide the footer's edge behind an expanded URL bar. The 92% is the
+decision, not the technique: all of it and the footer is unreachable without a
+scrollbar to hint at it, less of it and the footer stops being below the fold.
+The bar's height comes from `--tw-hdr-h`, declared beside the bar in
+`css/shell.css`, so the subtraction cannot drift from the real height.
 
 ---
 
@@ -151,8 +167,19 @@ Also rejected: hand-writing the language options in HTML, as the previous
 landing did with three `<li>`, which made adding a language a code change.
 
 The design draws 32px pills with 13px text, missing the iOS tap target by 12px.
+The bar itself is 52px, and 64px above 700px (v1.0.2, down from 56 and 74):
+a promo landing's first screen belongs to the mechanic, and the controls stayed
+at 44px because the tap target is not what was too big.
+
 `header.mute: false` omits the speaker rather than disabling it — a campaign
-with no audio should not render a dead control. The bar is a stacking context at
+with no audio should not render a dead control. So does an empty
+`campaign.js § sounds`: from v1.0.2 the speaker needs both, because
+`js/audio.js` pools nothing without clips and a button that toggles nothing is
+worse than no button. That file is shared and the shell wires it — the shell
+drew the speaker and left the wiring to each campaign, which is one forgotten
+campaign away from a dead control, and it was written twice already. A mechanic
+says `TW.sound('kick', 0.9)` and owns no audio code: the gesture unlock, the
+persisted mute state and a clip that failed to load are the shell's problem. The bar is a stacking context at
 `z-index: 46`, which caps the language menu; the dialog is in the top layer and
 outranks both.
 

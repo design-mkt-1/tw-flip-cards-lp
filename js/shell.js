@@ -177,7 +177,10 @@
     var langs = (C.languages || []).filter(function (code) { return LOC[code]; });
 
     var right = '';
-    if (h.mute) {
+    /* A speaker that toggles nothing is worse than no speaker, so the button
+       needs BOTH the campaign's say-so and at least one clip in
+       campaign.js § sounds for js/audio.js to have pooled. */
+    if (h.mute && window.TWAudio && TWAudio.has()) {
       right += '<button class="tw-mute" type="button" aria-pressed="false" ' +
                'data-i18n-attr="aria-label:hdr.sound">' + ICON.sound + '</button>';
     }
@@ -394,6 +397,17 @@
 
     if (window.TWForm) TWForm.mount(document.getElementById('tw-signup'));
 
+    /* The mute button. It was rendered here and wired in each campaign, which
+       is one campaign away from a speaker that does nothing -- so the shell
+       that draws it now owns it. */
+    if (window.TWAudio) {
+      var mute = document.querySelector('.tw-mute');
+      if (mute) {
+        mute.setAttribute('aria-pressed', String(TWAudio.isMuted()));
+        mute.addEventListener('click', function () { TWAudio.toggle(); });
+      }
+    }
+
     /* i18n last, so it renders markup that already exists. It also sets
        <html lang> to the real BCP-47 tag. */
     if (window.TWI18n) {
@@ -425,6 +439,11 @@
     openForm: function () { if (window.TWForm) TWForm.open(); },
     closeForm: function () { if (window.TWForm) TWForm.close(); },
     showDone: function (res) { if (window.TWForm) TWForm.showDone(res); },
+    /* Sound. The mechanic names a clip from campaign.js § sounds and a volume;
+       everything else -- the gesture unlock, the mute state, a file that never
+       loaded -- is js/audio.js's problem. */
+    sound: function (name, volume) { if (window.TWAudio) TWAudio.play(name, volume); },
+    muted: function () { return window.TWAudio ? TWAudio.isMuted() : false; },
     track: track,
     on: on,
     emit: emit,

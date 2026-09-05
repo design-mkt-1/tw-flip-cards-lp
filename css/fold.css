@@ -1,0 +1,101 @@
+/* Top Win — the fold. OPTIONAL, and off unless a campaign asks.
+
+   The third page shape. The other two:
+
+     nothing        an ordinary scrolling page. Header, <main>, footer, all
+                    ordinary blocks, all as tall as their content.
+     css/stage.css  a fixed full-screen stage. Nothing scrolls, ever, and the
+                    footer is a row of the screen the mechanic does not get.
+
+   This one is between them: the mechanic gets a definite box just under a full
+   screen, the page scrolls, and the FOOTER STARTS BELOW THE FOLD. One line in
+   the campaign's index.html buys it, in place of the css/stage.css line:
+
+     <link rel="stylesheet" href="css/fold.css">
+
+   after css/shell.css and before campaign/main.css. Link at most ONE of these
+   two: they are two answers to the same question and the second one loaded
+   would win at random.
+
+   WHY IT EXISTS. A promo landing wants its hero to own the first screen -- the
+   footer is payment marks and a copyright line, and it was taking a band off
+   the bottom of the mechanic on the one screen that has to sell. But the
+   footer still has to be reachable, and a page with no scrollbar at all gives
+   a visitor no sign that anything follows.
+
+   So the mechanic gets 92% of the screen rather than all of it, and the eight
+   points left over are the top edge of the footer: enough to read as "there is
+   more", not enough to read as content. The number is deliberate and it is the
+   only one in this file worth arguing about.
+
+   WHAT IT COSTS. #tw-main clips what it cannot fit, exactly as css/stage.css
+   does -- it is a definite box, not a box that grows. A campaign whose content
+   cannot compress wants the plain scrolling page instead.
+
+   Like css/stage.css, this file is allowed viewport units and the page box.
+   No other stylesheet is: two files with an opinion about the page box is how
+   a shell stops being reusable. */
+
+
+/* ══ the page ═════════════════════════════════════════════════
+   Nothing is pinned here. The document scrolls the way a document does, which
+   is what puts the footer under the fold and gives the visitor a scrollbar to
+   read that from.
+
+   `svh`, not `vh` or `dvh`. On iOS 100vh is the tallest the viewport ever gets
+   -- URL bar retracted -- so a vh-sized hero is taller than the window holding
+   it and the footer starts a bar's height further down than intended. dvh is
+   correct at every instant and reflows the entire hero every time that bar
+   slides. svh is the small viewport: stable, and the one that cannot hide the
+   footer's edge. */
+
+html {
+  background: var(--surface-sunken);
+  /* The dialog locks scrolling on <html>; reserving the gutter means the page
+     behind it does not jump sideways by a scrollbar's width when it opens. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100svh;
+  padding:
+    env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--surface);
+  background-clip: content-box;
+  color: var(--text);
+  font-family: var(--font);
+  /* Removes the double-tap zoom delay from every control at once. Pinch zoom
+     is left alone on purpose: it is an accessibility feature. */
+  touch-action: manipulation;
+}
+
+
+/* ══ the fold ═════════════════════════════════════════════════
+   `height`, not `min-height`: a size container needs a definite size, and the
+   mechanic's own cqh is worth more than the ability to grow -- a campaign that
+   wants to grow is a campaign that wants the plain scrolling page.
+
+   --tw-hdr-h is declared in css/shell.css beside the bar it measures, so this
+   subtraction cannot fall out of step with the bar's real height. The footer
+   is not subtracted: it is not meant to fit. */
+
+#tw-main {
+  position: relative;
+  height: calc(92svh - var(--tw-hdr-h));
+  overflow: hidden;
+  /* `/ size` so cqh and cqw INSIDE the mechanic mean "of the space the
+     mechanic got". That is the campaign's unit to use or ignore -- the shell
+     never reads it. A container cannot be styled by its own query, so a
+     campaign that restructures #tw-main itself puts a wrapper inside it and
+     queries tw-main from there. */
+  container: tw-main / size;
+}
+
+
+/* ══ what this file deliberately does not do ══════════════════
+   css/stage.css drops the footer in landscape on a short screen, because there
+   it is a row taken from a mechanic that has none to give. Here the footer is
+   already below the fold and costs the mechanic nothing, so there is nothing
+   to drop and no breakpoint to write. A campaign that wants to restructure at
+   some size queries tw-main from inside its own wrapper. */

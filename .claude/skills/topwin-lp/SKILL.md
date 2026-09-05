@@ -60,6 +60,12 @@ do not relitigate it here.
 - The registration card is a native `<dialog>` opened with `showModal()`, and
   `TW.openForm()` is the only seam into it. Never call `showModal()` yourself,
   never re-implement the card, never reach into its DOM.
+- Sound is the shell's too: clips are named in `campaign.js § sounds`, played
+  with `TW.sound(name, volume)`, and the speaker is wired by `js/shell.js`. A
+  mechanic that writes its own audio pool has rewritten `js/audio.js`.
+- The page shape is one `<link>`: none (a scrolling page), `css/stage.css` (a
+  fixed stage that never scrolls) or `css/fold.css` (the mechanic gets 92% of
+  the screen and the footer starts below the fold). Never two of them.
 - Offer figures are numbers in `campaign.js § "The offer"` and are interpolated
   into every locale as `{percent} {amount} {currency} {spins}`. They are never
   written into a language table.
@@ -84,7 +90,8 @@ do not relitigate it here.
 
 ```
 css/reset.css   css/tokens.css   css/shell.css   css/form.css   css/stage.css
-js/strings.js   js/i18n.js       js/form.js      js/shell.js
+css/fold.css    js/strings.js    js/i18n.js      js/form.js      js/audio.js
+js/shell.js
 tools/drift.py  tools/tokens.py  tools/smoke.py  tools/fonts.py
 .github/workflows/pages.yml
 ```
@@ -172,6 +179,6 @@ with the exact commands. Follow it; these eight steps are the map.
 - `superpowers:test-driven-development` — no framework, no `package.json`, no
   runner. Verification is the four guards in `tools/`.
 
-TEMPLATE-REV: v1.0.1 — before starting, compare this against the template's
+TEMPLATE-REV: v1.0.2 — before starting, compare this against the template's
 HEAD tag; if they differ, read the template's diff before trusting any path or
 value quoted here.

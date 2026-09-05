@@ -89,6 +89,7 @@ It is the only config file. Every key is commented in place.
 |---|---|
 | **scrolling page** — hero, sections, footer | nothing |
 | **fixed stage** — full screen, never scrolls | uncomment `<link rel="stylesheet" href="css/stage.css">` in `index.html` |
+| **the fold** — one screen of mechanic, footer below it | uncomment `<link rel="stylesheet" href="css/fold.css">` instead. Never both |
 | **artboard unit** — pixel-exact Figma hero | define `--u` in `campaign/main.css` (there is a worked example in its header) |
 
 Write which one, and why, in `docs/BRIEF.md`.

@@ -33,6 +33,11 @@
    entirely when campaign.js turns them off -- a campaign with no audio should
    not render a dead speaker. */
 
+/* The bar's height is a variable because css/fold.css needs the same number:
+   it sizes #tw-main as the screen minus this bar, and a second copy of 52
+   somewhere else is a number that drifts the first time the design moves. */
+:root { --tw-hdr-h: 52px; }
+
 .tw-hdr {
   position: relative;
   /* A stacking context, so .tw-langmenu's own z-index is capped at whatever
@@ -44,7 +49,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  height: 56px;
+  height: var(--tw-hdr-h);
   padding: 0 16px;
   background: var(--chrome-bar);
   backdrop-filter: blur(12px);
@@ -52,7 +57,7 @@
   border-bottom: 1px solid var(--chrome-hair);
 }
 
-.tw-hdr__logo img { height: 24px; width: auto; }
+.tw-hdr__logo img { height: 22px; width: auto; }
 
 .tw-hdr__right { display: flex; align-items: center; gap: 8px; }
 
@@ -294,8 +299,9 @@
    19:3624 for the footer, and the taller header bar, at one breakpoint. */
 
 @media (min-width: 700px) {
-  .tw-hdr { height: 74px; padding: 0 clamp(16px, 3vw, 30px); }
-  .tw-hdr__logo img { height: 34px; }
+  :root { --tw-hdr-h: 64px; }
+  .tw-hdr { padding: 0 clamp(16px, 3vw, 30px); }
+  .tw-hdr__logo img { height: 28px; }
 
   .tw-ftr {
     flex-direction: row;

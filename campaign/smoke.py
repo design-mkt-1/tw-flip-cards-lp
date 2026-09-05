@@ -11,7 +11,10 @@ Three things, all of which broke at least once in this landing's history:
      -- not the prize, which would give the game away before it is turned;
   2. turning three opens the registration card BY ITSELF, and the board goes
      to its reveal phase with the other six face up;
-  3. dismissing the card leaves the claim button as the way back in. It was
+  3. the speaker in the header mutes and the choice survives a reload. This
+     landing had no sound at all until the shell grew js/audio.js, so the
+     button being there is also the proof that campaign.js § sounds arrived;
+  4. dismissing the card leaves the claim button as the way back in. It was
      `display: none` until the win, so if the win never marked it the visitor
      who pressed Escape had no route to the form at all.
 """
@@ -30,6 +33,20 @@ def check(page, viewport, lang):
     name = page.eval_on_selector(
         '.cmp-cell[data-pos="1"] [data-role="label"]', "el => el.textContent.trim()")
     assert name and "card." not in name, f"{tag} card 1 announces {name!r}"
+
+    # The speaker. js/shell.js renders it only when header.mute is true AND
+    # js/audio.js pooled at least one clip, so this asserts both.
+    mute = page.locator(".tw-mute")
+    assert mute.count() == 1, f"{tag} the header has no mute button"
+    assert page.evaluate("TW.muted()") is False, f"{tag} the page starts muted"
+    mute.click()
+    assert page.evaluate("TW.muted()") is True, f"{tag} the speaker did not mute"
+    assert mute.get_attribute("aria-pressed") == "true", f"{tag} aria-pressed did not follow"
+    page.reload()
+    page.wait_for_timeout(400)
+    assert page.evaluate("TW.muted()") is True, f"{tag} mute did not survive a reload"
+    # Leave the origin as it was found: the flag lives in localStorage.
+    page.evaluate("TWAudio.setMuted(false)")
 
     # 1, 2, 3 — and the third opens the dialog on its own.
     for pos in (1, 2, 3):

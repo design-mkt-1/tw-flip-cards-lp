@@ -172,7 +172,22 @@ window.TW_CAMPAIGN = {
     themeColor: '#00002e',                    // --navy-950
     payments:   ['visa', 'mastercard', 'tether', 'bitcoin']
   },
-  header: { show: true, mute: false, lang: true },
+  header: { show: true, mute: true, lang: true },
+
+  /* ── Sound ────────────────────────────────────────────────────
+     name -> file. js/audio.js pools these and loads nothing until the
+     visitor's first gesture; js/shell.js wires the speaker; the mechanic only
+     says TW.sound('flip', 0.7).
+
+     All three are rendered by tools/sfx.py rather than sourced -- the output
+     is reproducible from this repository, carries no third-party licence onto
+     a commercial landing page, and is re-tuned by editing a number rather
+     than by finding another clip that nearly fits. */
+  sounds: {
+    flip: 'campaign/assets/audio/flip.mp3',
+    pip:  'campaign/assets/audio/pip.mp3',
+    win:  'campaign/assets/audio/win.mp3'
+  },
   footer: { show: true },
 
   /* ── Campaign copy, per locale ────────────────────────────────

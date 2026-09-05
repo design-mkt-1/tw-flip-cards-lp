@@ -15,6 +15,7 @@
      TW.openForm()      open the registration dialog — the point of the page
      TW.t(key, vars)    a translated string; the offer figures fill themselves
      TW.on('lang')      relabel the nine cards when the language changes
+     TW.sound(name, v)  one of campaign.js § sounds, at volume v
      TW.track(event)    analytics; a no-op unless an id is configured
      TW.config          campaign.js, including the deck and the offer
 
@@ -264,6 +265,9 @@
     cell.dataset.win = '';
     btn.style.willChange = 'transform';
     btn.setAttribute('aria-pressed', 'true');
+    /* With the rotation, not before it: the swish is the card in the air and
+       the tap inside the clip lands about where the face passes edge-on. */
+    TW.sound('flip', 0.7);
 
     setLabel(cell, 'card.win');
 
@@ -275,6 +279,9 @@
 
     state.found += 1;
     setPips(state.found);
+    /* Quieter than the card, and after it: the mark filling is a confirmation,
+       not an event of its own. */
+    TW.sound('pip', 0.45);
     announce(TW.t('progress', { n: state.found }));
     TW.track('card_flip', { turned: state.found });
 
@@ -292,6 +299,11 @@
       grid.dataset.phase = 'reveal';
       if (claim) claim.setAttribute('data-on', '');
       revealRest();
+      /* With the board's own reveal, and it is 900ms long against the 240ms
+         before the dialog opens -- so it plays UNDER the form appearing and
+         is gone shortly after. Anything longer would be still playing over
+         somebody else's moment. */
+      TW.sound('win', 0.8);
     }, T.flip + T.hold);
 
     window.setTimeout(function () {
