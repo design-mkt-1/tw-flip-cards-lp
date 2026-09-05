@@ -1,0 +1,345 @@
+/* Top Win shell — the header and the footer.
+
+   These two bars are identical in every campaign. Injected by js/shell.js,
+   styled here, and never edited in a clone: tools/drift.py fails CI if this
+   file moves.
+
+   LAYOUT NEUTRALITY IS THE WHOLE POINT OF THIS FILE.
+
+   Both bars are block-level with intrinsic height, and every length is px,
+   rem or clamp() of a viewport width. There is no cqh, no cqw, no --u and no
+   vh anywhere below. Those units are exactly what welded the last two
+   landings to their own layouts: the header lived inside a container query on
+   #stage and could not be lifted out, and the other page's chrome was
+   measured in artboard units and could not be reused at any other size.
+
+   The campaign picks the layout, not this file:
+     scrolling page  -> nothing to do, these are ordinary blocks
+     fixed stage     -> <link rel="stylesheet" href="css/stage.css">
+     artboard units  -> define --u in campaign/main.css, chrome stays px
+
+   Colours come from css/tokens.css only. There is not one hex literal here
+   and tools/tokens.py --check enforces that.
+
+   The breakpoint is 700px, once, shared by both bars. It is the width the
+   footer's two Figma nodes disagree at (19:3717 mobile stack, 19:3624 desktop
+   row); the header simply takes its taller bar at the same time rather than
+   introducing a second number. */
+
+
+/* ══ header ═══════════════════════════════════════════════════
+   Figma 1:3797. Logo left; the sound toggle and the language listbox right.
+   Both right-hand controls are optional and js/shell.js omits the markup
+   entirely when campaign.js turns them off -- a campaign with no audio should
+   not render a dead speaker. */
+
+.tw-hdr {
+  position: relative;
+  /* A stacking context, so .tw-langmenu's own z-index is capped at whatever
+     this sits at. 46 puts the bar above anything a mechanic draws and below
+     the dialog, which is in the top layer and outranks both regardless. */
+  z-index: 46;
+  flex: 0 0 auto;              /* only meaningful under css/stage.css */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 56px;
+  padding: 0 16px;
+  background: var(--chrome-bar);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--chrome-hair);
+}
+
+.tw-hdr__logo img { height: 24px; width: auto; }
+
+.tw-hdr__right { display: flex; align-items: center; gap: 8px; }
+
+/* 44px controls with a 16px label: the design draws 32px pills with 13px
+   text, which misses the tap target iOS asks for by 12px. */
+.tw-mute,
+.tw-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--chrome-ctl-brd);
+  background: var(--chrome-ctl);
+  color: var(--text);
+  font-family: var(--font);
+  font-weight: var(--fw-semi);
+  font-size: 16px;
+  transition: scale 140ms var(--ease-out);
+}
+
+.tw-mute { width: 44px; padding: 0; justify-content: center; }
+
+.tw-mute svg,
+.tw-lang svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tw-mute .tw-mute__spk { fill: currentColor; stroke: none; }
+.tw-mute .tw-mute__off { display: none; }
+.tw-mute[aria-pressed="true"] .tw-mute__on  { display: none; }
+.tw-mute[aria-pressed="true"] .tw-mute__off { display: block; }
+
+/* The accent outline is the design's treatment for this trigger and the label
+   stays white against it: the outline already says which control it is, and
+   an accent-coloured label on an accent outline says it twice. */
+.tw-lang { border-color: var(--accent); color: var(--white); }
+.tw-lang__caret { width: 14px; height: 14px; transition: transform 180ms var(--ease-out); }
+.tw-lang[aria-expanded="true"] .tw-lang__caret { transform: rotate(180deg); }
+
+/* Press feedback. They are buttons and were behaving like labels. The logo is
+   qualified on [href] because it only becomes a link when links.home is set
+   in campaign.js -- a mark that shrinks under the thumb and then does nothing
+   reads as a broken control rather than as a logo. */
+.tw-mute:active,
+.tw-lang:active,
+.tw-hdr__logo[href]:active { scale: .95; }
+
+.tw-hdr__logo:focus-visible,
+.tw-mute:focus-visible,
+.tw-lang:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+
+/* ══ language listbox ═════════════════════════════════════════
+   Grows out of the button it hangs from, so it reads as coming from there
+   rather than appearing over the header.
+
+   reset.css forces [hidden] to display:none !important and display cannot be
+   transitioned, so the open state is a class and js/i18n.js unhides one frame
+   ahead of adding it. The dialog does the same two-step for the same reason.
+
+   Rows run flush to the edges and are divided by hairlines, so there is no
+   padding on the list and no radius on a row. */
+
+.tw-lang-wrap { position: relative; }
+
+.tw-langmenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 286px;
+  max-width: calc(100vw - 24px);
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border-radius: 14px;
+  border: .5px solid var(--chrome-menu-brd);
+  background: var(--chrome-menu);
+  box-shadow: var(--chrome-shadow);
+  transform-origin: top right;
+  opacity: 0;
+  transform: translateY(-6px) scale(.96);
+  pointer-events: none;
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+
+/* Entry is slower than exit: arriving is worth watching, leaving is not. */
+.tw-langmenu.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition-duration: 180ms;
+}
+
+.tw-langopt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 16px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.tw-langopt + .tw-langopt { border-top: .5px solid var(--chrome-menu-brd); }
+
+/* Flags carry the meaning at a glance; the code and the endonym beside them
+   settle the ambiguity a flag alone would leave -- English is not a country.
+   The design uses flag emoji, which draw differently on every platform and
+   which Windows renders as the letters "UA". These are the MIT SVGs in
+   assets/img/icons/. GB is the convention for EN. */
+.tw-langopt__flag {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 18px;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--flag-ring);
+}
+
+.tw-langopt__code { flex: 0 0 32px; color: var(--chrome-hint); font-size: 15px; }
+.tw-langopt__name { flex: 1 1 auto; color: var(--white); }
+
+/* A drawn tick rather than U+2713: that codepoint sits outside the latin
+   subset this repo ships, so the glyph would arrive from a fallback face. */
+.tw-langopt__check {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.tw-langopt[aria-selected="true"] { background: var(--chrome-ctl); }
+.tw-langopt[aria-selected="true"] .tw-langopt__check { opacity: 1; }
+
+/* Arrow keys move focus through the list, so the focused option has to be
+   visible even when the menu was opened by tapping. */
+.tw-langopt:focus { background: var(--chrome-hover); outline: none; }
+.tw-langopt:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .tw-langopt:hover { background: var(--chrome-hover); }
+}
+
+
+/* ══ footer ═══════════════════════════════════════════════════
+   Figma 19:3717 (mobile) and 19:3624 (desktop). Two arrangements, not two
+   sizes: mobile stacks the payments over a rule over the copyright; desktop
+   puts the logo and the copyright left and the payments right, for a third
+   less height. Both are implemented and the wide one applies as soon as there
+   is room, because on a stage-mode page that height is height the mechanic
+   keeps. */
+
+.tw-ftr {
+  position: relative;
+  z-index: 46;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  background: var(--footer-bg);
+  color: var(--footer-fg);
+  text-align: center;
+}
+
+/* The logo plate belongs to the desktop arrangement only. */
+.tw-ftr__logo { display: none; }
+
+.tw-ftr__pay { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+.tw-ftr__label {
+  font-size: 12px;
+  font-weight: var(--fw-semi);
+  text-transform: uppercase;
+}
+
+.tw-ftr__marks {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tw-ftr__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--footer-brd);
+  border-radius: var(--r-sm);
+  background: var(--pay-bg);
+}
+
+/* One rule for the height the badges share, and an explicit width for each of
+   the three aspect ratios. `auto` would let a stretched viewBox decide. */
+.tw-ftr__mark { height: 24px; width: 24px; }
+.tw-ftr__mark--visa { width: 74px; }
+.tw-ftr__mark--mc   { width: 39px; }
+
+/* The rule between the payments and the copyright is a border on the
+   copyright rather than an element of its own: the flex gap above it already
+   supplies the space the design puts on that side. */
+.tw-ftr__copy {
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--footer-brd);
+  font-size: 12px;
+  font-weight: var(--fw-regular);
+}
+
+
+/* ── the wide arrangement ─────────────────────────────────────
+   19:3624 for the footer, and the taller header bar, at one breakpoint. */
+
+@media (min-width: 700px) {
+  .tw-hdr { height: 74px; padding: 0 clamp(16px, 3vw, 30px); }
+  .tw-hdr__logo img { height: 34px; }
+
+  .tw-ftr {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    padding: 24px clamp(24px, 6.25vw, 120px) 20px;
+    text-align: left;
+  }
+
+  /* The logo is orange and navy, and the navy half of it disappears on
+     --footer-bg -- which is why the design stands it on a white plate here
+     and leaves it out of the mobile node altogether. */
+  .tw-ftr__logo {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 110px;
+    height: 24px;
+    padding: 3.4px 8.2px;
+    border-radius: 4px;
+    background: var(--white);
+    filter: var(--plate-shadow);
+  }
+
+  .tw-ftr__logo img { width: 96px; height: 17px; }
+
+  /* The two nodes disagree about order, so the DOM carries the mobile one --
+     payments, then copyright -- and this layout restates its own. Reading
+     order and visual order match in both, which is the reason to do it here
+     rather than by moving the markup and pushing the mismatch onto mobile. */
+  .tw-ftr__logo { order: 1; }
+  .tw-ftr__copy { order: 2; }
+  .tw-ftr__pay  { order: 3; }
+
+  .tw-ftr__copy {
+    flex: 1 0 0;
+    width: auto;
+    padding-top: 0;
+    border-top: 0;
+    font-size: 14px;
+  }
+
+  .tw-ftr__pay   { align-items: flex-end; gap: 16px; }
+  .tw-ftr__label { font-size: 14px; text-align: right; }
+}

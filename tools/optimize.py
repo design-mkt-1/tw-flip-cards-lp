@@ -1,257 +1,147 @@
 #!/usr/bin/env python3
+"""Turn raw/img/ exports into the AVIF and WebP files the page actually ships.
+
+Run by hand, never at deploy time: the deploy is a file copy, and the outputs
+of this script are committed. That is the whole build system.
+
+    python -m pip install "pillow>=10" pillow-avif-plugin
+    python tools/optimize.py                    # every file in raw/img/
+    python tools/optimize.py hero.png           # just one
+    python tools/optimize.py hero.png --widths 375,1280,1920
+
+For each source it writes campaign/assets/<name>-<width>.avif and .webp. A
+source with no --widths is written once at its own size, without a width
+suffix. Pass --out to write somewhere else.
+
+campaign/assets/ and not assets/img/, on purpose: assets/img/ holds the brand
+-- the logo, the payment marks, the flags, the icons -- and is identical in
+every campaign. Everything a campaign generates is its own and belongs in the
+slot that gets replaced.
+
+Why both formats: AVIF is roughly a fifth the size at the same quality, and
+WebP is the fallback for the browsers that do not have it. In the markup put
+the AVIF <source> first and the widest media query first -- first match wins,
+and reversing it downloads the 375px crop to every desktop.
+
+Transparency is flattened onto the page background rather than kept: an alpha
+channel costs more than the edge it buys on a hero that sits on a solid stage.
+Pass --keep-alpha for art that genuinely needs it.
+
+NEVER ship the Figma PNG. One 1.7 MB export became a 23 KB AVIF in the landing
+this is taken from.
 """
-Turn the raw Figma exports in raw/img/ into the web assets in assets/img/.
 
-Run by hand, from the project root:
-
-    python tools/optimize.py
-
-This is NOT a build step. The published site never touches raw/ or tools/.
-The raw exports are kept so a designer can re-crop later without going back
-to a Figma link that has expired. Re-run this only when raw/img/ changes.
-
-Needs Pillow with WebP and AVIF support:
-
-    python -m pip install --upgrade Pillow
-"""
-
-from pathlib import Path
-import shutil
+import argparse
 import sys
+from pathlib import Path
 
-from PIL import Image, ImageFilter, features
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "raw" / "img"
-OUT = ROOT / "assets" / "img"
-ICONS = OUT / "icons"
+OUT = ROOT / "campaign" / "assets"
 
-# The page background. Any transparency in a Figma export is flattened onto
-# this so the encoders never have to carry an alpha channel.
-PAGE_BG = (0, 0, 46)
+# --navy-950, the page behind the stage. Alpha is flattened onto this so an
+# edge never shows a grey or a white halo.
+BACKDROP = (4, 4, 18)
 
-# Quality settings. AVIF is far kinder to the dark smooth gradients in the
-# hero than WebP is, so it can afford a much lower number for the same look.
-AVIF_Q = 50
-WEBP_Q = 80
-
-# SVGs that are copied through untouched.
-SVG_PASSTHROUGH = {
-    "logo-topwin.svg": OUT,
-    "icon-eye.svg": ICONS,
-    "flag-ua.svg": ICONS,
-    "icon-check.svg": ICONS,
-    "icon-copy.svg": ICONS,
-    "pay-visa.svg": ICONS,
-    "pay-mastercard.svg": ICONS,
-    "pay-tether.svg": ICONS,
-    "pay-bitcoin.svg": ICONS,
-}
-
-# Three entries above are not plain Figma exports. flag-ua.svg is not an export
-# at all: it stands in for the emoji Windows cannot draw. icon-eye.svg is an
-# export plus the pupil, which the exporter drops. icon-copy.svg is drawn by
-# hand from the two rectangles Figma composes the copy button out of
-# (19:2532 / 19:2533), because they are frame borders, not a vector node.
-# All three are explained in the README, section 7.
-
-# The five social-*.svg exports are deliberately NOT copied either. The footer
-# the design team redrew (Figma 19:2691 / 19:2784) has no social row at all.
-# The exports stay in raw/ so the row can be put back without a fresh export.
-
-# raw/img/card-glow.svg and raw/img/card-sphere.svg are deliberately NOT
-# copied. Both sit above the card's top edge inside a clipped container, so
-# they render as nothing. Verified against the Figma render of node 12:287.
+AVIF_QUALITY = 50
+WEBP_QUALITY = 80
+SOURCES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"}
 
 
-def flatten(im: Image.Image) -> Image.Image:
-    """Drop the alpha channel onto the page background."""
-    if im.mode in ("RGBA", "LA", "P"):
-        im = im.convert("RGBA")
-        bg = Image.new("RGB", im.size, PAGE_BG)
-        bg.paste(im, mask=im.split()[-1])
-        return bg
-    return im.convert("RGB")
+def load():
+    try:
+        from PIL import Image
+    except ImportError:
+        print('optimize: pillow is not installed.\n'
+              '  python -m pip install "pillow>=10" pillow-avif-plugin', file=sys.stderr)
+        raise SystemExit(1)
+    try:
+        import pillow_avif  # noqa: F401  -- registers the AVIF plugin with Pillow
+    except ImportError:
+        print("optimize: pillow-avif-plugin is not installed; AVIF will be skipped.\n"
+              "  python -m pip install pillow-avif-plugin", file=sys.stderr)
+    return Image
 
 
-def kb(path: Path) -> str:
-    return f"{path.stat().st_size / 1024:6.1f} KB"
+def convert(Image, src: Path, widths, keep_alpha: bool) -> int:
+    img = Image.open(src)
+    if not keep_alpha and img.mode in ("RGBA", "LA", "P"):
+        flat = Image.new("RGB", img.size, BACKDROP)
+        rgba = img.convert("RGBA")
+        flat.paste(rgba, mask=rgba.split()[-1])
+        img = flat
+    else:
+        img = img.convert("RGBA" if keep_alpha else "RGB")
 
+    OUT.mkdir(parents=True, exist_ok=True)
+    written = 0
 
-def write_pair(im: Image.Image, stem: str) -> None:
-    """Write one image as both AVIF and WebP."""
-    avif = OUT / f"{stem}.avif"
-    webp = OUT / f"{stem}.webp"
-    im.save(avif, format="AVIF", quality=AVIF_Q)
-    im.save(webp, format="WEBP", quality=WEBP_Q, method=6)
-    print(f"  {avif.name:<24} {kb(avif)}")
-    print(f"  {webp.name:<24} {kb(webp)}")
+    for width in widths or [None]:
+        frame = img
+        suffix = ""
+        if width and width < img.width:
+            height = round(img.height * width / img.width)
+            frame = img.resize((width, height), Image.LANCZOS)
+            suffix = f"-{width}"
+        elif width:
+            suffix = f"-{width}"
 
-
-def erase_baked_card_shadows(im: Image.Image, box: tuple, feather: int = 24) -> None:
-    """
-    Paint out the card shadows Figma baked onto the platform.
-
-    The scene was composed with three ellipse shadows under the spots where
-    the bottom card row sits in the 1920x1080 comp. The real grid is laid out
-    responsively and never lines up with them, so on the page they read as
-    three random dark blobs floating on the platform (owner request,
-    2026-09-03: remove them).
-
-    The platform surface is a smooth near-vertical gradient, so each column
-    of the strip is rebuilt by linearly interpolating between the clean rows
-    just above and below the box, which also preserves the subtle vertical
-    streaks. The patch is blended in through a feathered mask so no seam
-    shows at the edges.
-    """
-    x1, y1, x2, y2 = box
-    src = im.load()
-    w, h = x2 - x1, y2 - y1
-
-    def refs(y):
-        """One reference pixel per column, with neon-line crossings repaired.
-
-        The hexagon's bright edge lines clip the corners of the reference
-        rows. A contaminated reference would smear a bright streak down the
-        whole column, so any pixel well above the row's median luminance is
-        replaced by its nearest clean neighbour (the platform gradient
-        changes slowly along x, so the neighbour is a faithful stand-in).
-        """
-        row = [src[x1 + ix, y] for ix in range(w)]
-        lums = [0.299 * r[0] + 0.587 * r[1] + 0.114 * r[2] for r in row]
-        limit = sorted(lums)[w // 2] + 22
-        for i in range(w):
-            if lums[i] <= limit:
+        for ext, kwargs in (("avif", {"quality": AVIF_QUALITY}),
+                            ("webp", {"quality": WEBP_QUALITY, "method": 6})):
+            target = OUT / f"{src.stem}{suffix}.{ext}"
+            try:
+                frame.save(target, **kwargs)
+            except (OSError, KeyError, ValueError) as exc:
+                print(f"  {target.name}: skipped ({exc})")
                 continue
-            for j in range(1, w):
-                if i - j >= 0 and lums[i - j] <= limit:
-                    row[i] = row[i - j]
-                    break
-                if i + j < w and lums[i + j] <= limit:
-                    row[i] = row[i + j]
-                    break
-        return row
+            print(f"  {target.name}  {target.stat().st_size // 1024} KB")
+            written += 1
 
-    top_refs = refs(y1 - 2)
-    bot_refs = refs(y2 + 1)
-
-    patch = Image.new("RGB", (w, h))
-    pp = patch.load()
-    for ix in range(w):
-        top = top_refs[ix]
-        bot = bot_refs[ix]
-        for iy in range(h):
-            t = (iy + 1) / (h + 1)
-            pp[ix, iy] = tuple(round(top[c] + (bot[c] - top[c]) * t) for c in range(3))
-    patch = patch.filter(ImageFilter.GaussianBlur(1.2))
-
-    mask = Image.new("L", (w, h), 255)
-    mp = mask.load()
-    v_feather = max(3, h // 8)
-    for ix in range(w):
-        hx = min(ix, w - 1 - ix)
-        for iy in range(h):
-            hy = min(iy, h - 1 - iy)
-            v = 255
-            if hx < feather:
-                v = min(v, round(255 * hx / feather))
-            if hy < v_feather:
-                v = min(v, round(255 * hy / v_feather))
-            mp[ix, iy] = v
-
-    im.paste(patch, (x1, y1), mask)
-
-
-def build_hero() -> None:
-    print("hero")
-    src = flatten(Image.open(RAW / "hero-desktop.png"))
-    # Ellipse strip measured on the 1920x1080 export; the box stops short of
-    # the platform's neon edge lines and the star art on every side.
-    erase_baked_card_shadows(src, (1150, 916, 1786, 970))
-    # 1920 is the native export width. Never upscale past it.
-    for width in (1280, 1920):
-        if width > src.width:
-            continue
-        h = round(src.height * width / src.width)
-        write_pair(src.resize((width, h), Image.LANCZOS), f"hero-{width}")
-
-    mob = flatten(Image.open(RAW / "hero-mobile.png"))
-    # The same baked shadows, measured on the 375x666 export. The bottom edge
-    # sits just above the platform's neon line at y=584.
-    erase_baked_card_shadows(mob, (36, 556, 352, 582), feather=16)
-    write_pair(mob, f"hero-m-{mob.width}")
-    if mob.width < 750:
-        print(
-            f"  note: the mobile hero is only {mob.width}px wide. Figma will not\n"
-            "        render a node above its natural size, so there is no 2x cut.\n"
-            "        The scene is soft and glowing, so this is hard to see. For a\n"
-            "        sharper retina version, export node 12:311 from Figma at 2x,\n"
-            "        save it as raw/img/hero-mobile@2x.png and extend this script."
-        )
-
-
-def build_card_faces() -> None:
-    """
-    The three card faces are supplied as finished art, authored at exactly
-    twice the 272x381 card of the design:
-
-        closed_card.png   the back everyone sees first (TW logo, coins)
-        simple_card.png   the revealed face of a lower-tier card (white outline)
-        winning_card.png  the revealed face of a top-prize card (orange outline)
-
-    Each 640x858 export carries its own baked drop shadow around a 544x762
-    card body at (48, 40). The shadow is cropped away, NOT kept: the page
-    already casts the card's shadow from CSS (see styles.css section 7), and
-    it has to stay there because it changes on hover and must not rotate with
-    the flip.
-
-    Alpha is kept so the rounded corners composite cleanly over the page
-    gradient. The corner radius in the art is 88px, which is the design's
-    44 card units at this 2x scale -- the same radius styles.css clips to.
-    """
-    print("card faces")
-    body = (48, 40, 592, 802)  # 544x762 = 272x381 at 2x, measured from alpha
-    for name in ("closed_card", "simple_card", "winning_card"):
-        im = Image.open(RAW / f"{name}.png").convert("RGBA").crop(body)
-        out = OUT / f"{name}.webp"
-        im.save(out, format="WEBP", quality=WEBP_Q, method=6)
-        print(f"  {out.name:<24} {kb(out)}  ({im.width}x{im.height})")
-
-
-def copy_svgs() -> None:
-    print("svg")
-    for name, dest in SVG_PASSTHROUGH.items():
-        src = RAW / name
-        if not src.exists():
-            print(f"  MISSING {name}")
-            continue
-        dest.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dest / name)
-    print(f"  copied {len(SVG_PASSTHROUGH)} files")
+    return written
 
 
 def main() -> int:
-    if not features.check("webp"):
-        print("Pillow has no WebP support. Reinstall it.", file=sys.stderr)
-        return 1
-    if not features.check("avif"):
-        print("Pillow has no AVIF support. Reinstall it.", file=sys.stderr)
-        return 1
-    if not RAW.exists():
-        print(f"No raw exports at {RAW}", file=sys.stderr)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("names", nargs="*", help="file names inside raw/img/ (default: all)")
+    ap.add_argument("--widths", default="", help="comma-separated output widths")
+    ap.add_argument("--keep-alpha", action="store_true", help="do not flatten transparency")
+    ap.add_argument("--out", default="", help="output directory (default: campaign/assets)")
+    args = ap.parse_args()
+
+    Image = load()
+
+    global OUT
+    if args.out:
+        OUT = (ROOT / args.out).resolve()
+
+    if not RAW.is_dir():
+        print(f"optimize: {RAW.relative_to(ROOT).as_posix()} does not exist. "
+              "Put the Figma exports there; it is gitignored on purpose.")
         return 1
 
-    OUT.mkdir(parents=True, exist_ok=True)
-    ICONS.mkdir(parents=True, exist_ok=True)
+    widths = [int(w) for w in args.widths.split(",") if w.strip()]
+    files = ([RAW / n for n in args.names] if args.names
+             else sorted(p for p in RAW.iterdir() if p.suffix.lower() in SOURCES))
 
-    build_hero()
-    build_card_faces()
-    copy_svgs()
+    if not files:
+        print(f"optimize: nothing to do, {RAW.relative_to(ROOT).as_posix()} is empty")
+        return 0
 
-    total = sum(p.stat().st_size for p in OUT.rglob("*") if p.is_file())
-    print(f"\nassets/img total: {total / 1024:.1f} KB")
+    total = 0
+    for src in files:
+        if not src.is_file():
+            print(f"optimize: no such file: {src}", file=sys.stderr)
+            return 1
+        print(f"{src.name}  {src.stat().st_size // 1024} KB")
+        total += convert(Image, src, widths, args.keep_alpha)
+
+    print(f"\noptimize: wrote {total} file(s) into {OUT.relative_to(ROOT).as_posix()}/")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

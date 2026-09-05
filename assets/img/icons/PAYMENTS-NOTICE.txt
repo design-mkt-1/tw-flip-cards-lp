@@ -1,0 +1,19 @@
+The four payment marks in this directory were exported from the client's own
+Figma file, node 19:3720 (Footer, Device=Mobile, Language=UA), and are served
+from this repo for the same reason the fonts and the flags are: no visitor
+request reaches a third party.
+
+  pay-visa.svg        74 x 24
+  pay-mastercard.svg  38.769 x 24
+  pay-tether.svg      24 x 24
+  pay-bitcoin.svg     24 x 24
+
+The sizes are the design's own and are set explicitly in css/shell.css rather
+than being left to a single shared rule: the four marks have three different
+aspect ratios, and one rule that fits the Visa wordmark stretches the round
+ones.
+
+Visa, Mastercard, Tether and Bitcoin are trademarks of their respective owners.
+They appear here only to state which payment methods the operator accepts,
+which is the use the design puts them to. They are not covered by this repo's
+licence, and none of them is Top Win's mark.

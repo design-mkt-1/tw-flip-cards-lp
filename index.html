@@ -6,268 +6,210 @@
 <meta name="theme-color" content="#00002e">
 
 <!-- GitHub Pages cannot set response headers, so the policy ships as a meta.
-     The page references no external origin at all, and uses no data: URI, no
-     eval and no worker, which is why every directive below is 'self' or none.
+
+     THE SHIPPED PAGE REFERENCES NO EXTERNAL ORIGIN AT ALL — no CDN, no Google
+     Fonts, no tag manager — which is why every directive here is 'self' or
+     'none', and why the default campaign makes zero third-party requests.
 
      style-src carries 'unsafe-inline' for two real reasons, not laziness: the
-     noscript fallback near the end of this head is an inline style block, and
-     js/flip.js sets style attributes — the stagger index on each winning card
-     and will-change on a card mid-flip. Without it the no-JS fallback and the
-     reveal stagger both break, and they break SILENTLY: a CSP violation shows
-     up in the console and nowhere else.
+     noscript block at the end of this head is an inline style, and the shell
+     sets style attributes on elements it injects. Without it those break
+     SILENTLY — a CSP refusal appears in the console and nowhere else.
 
-     form-action is deliberately absent. It does not fall back to default-src,
-     so the form stays free to POST wherever IT wires it (README section 2).
+     form-action is deliberately absent. It does NOT fall back to default-src,
+     so the form stays free to POST wherever IT wires campaign.js form.endpoint.
      Adding it here would break that wiring on the day it happens.
      frame-ancestors is absent because browsers ignore it in a meta policy;
-     writing it here would only look like protection. -->
+     writing it would only look like protection.
+
+     ┌─ IF YOU SET analytics.gtmId OR analytics.metaPixelId IN campaign.js ─┐
+     │ comment out the meta below and uncomment the one after it. This is  │
+     │ the one campaign edit that cannot live in campaign.js: a meta policy │
+     │ cannot be written from JavaScript.                                   │
+     └──────────────────────────────────────────────────────────────────────┘ -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'">
+
+<!-- Analytics build. Add your own API origin to connect-src when IT gives you
+     form.endpoint.
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://connect.facebook.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google-analytics.com https://www.facebook.com; font-src 'self'; connect-src 'self' https://www.google-analytics.com; base-uri 'none'; object-src 'none'">
+-->
+
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
-<title>TopWin — Переверни картки, забери свій бонус!</title>
-<meta name="description" content="Переверни три картки і забери вітальний бонус 250.000 ₴ + 250FS у TopWin.">
+<!-- Static, because a crawler and a link preview read the head before any
+     script runs. The <title> is also re-rendered per language by js/i18n.js
+     via data-i18n; this is the default-locale copy it starts from. -->
+<title data-i18n="title">Top Win — Переверни картки, забери свій бонус!</title>
+<meta name="description" content="Переверни три картки і забери вітальний бонус 250.000 ₴ + 250FS у Top Win.">
 
-<link rel="alternate" hreflang="uk" href="./index.html">
-<link rel="alternate" hreflang="ru" href="./ru.html">
-<link rel="alternate" hreflang="en" href="./en.html">
-<link rel="alternate" hreflang="x-default" href="./en.html">
+<link rel="icon" href="assets/img/logo-topwin.svg" type="image/svg+xml">
 
-<!-- The headline face only. crossorigin is required even same-origin: without
-     it the preload is discarded and the font is fetched a second time.
-     en.html swaps this for the -latin cut. -->
-<link rel="preload" as="font" type="font/woff2" crossorigin
-      href="assets/fonts/roboto-var-black-italic-cyrillic.woff2">
+<!-- Fonts are discovered late: a face is only requested once a stylesheet has
+     been applied to text. Named here, they start with the stylesheets instead.
 
-<link rel="stylesheet" href="css/styles.css">
-<noscript><style>.fc-claim { display: block; }</style></noscript>
+     Two subsets, not one, and not because the default language is Ukrainian:
+     the first paint genuinely draws both scripts. The copy is Cyrillic; the
+     offer figures, the tab labels ("EMAIL") and the apostrophe in Заб’єш are
+     latin, and the Cyrillic range stops short of the apostrophe. The other six
+     woff2 — latin-ext, the italic cuts and the two hryvnia glyphs — stay
+     deferred: they belong to the dialog, which is closed at load. -->
+<!-- The hero is the LCP element and <picture> only discovers it after
+     campaign/main.css parses, so both crops are named here. AVIF, not WebP:
+     the <source> order in the markup puts AVIF first, so that is what a
+     browser which supports it actually fetches -- preloading the WebP would
+     warm a file the page never asks for, and the browser says so in the
+     console. `type` is what makes a browser without AVIF skip the hint
+     instead of downloading a format it cannot decode.
+
+     The desktop hint carries imagesrcset/imagesizes rather than a single
+     href: the <source> it belongs to is a two-candidate srcset, and a
+     plain href preloads whichever file the author guessed while the page
+     fetches whichever one the browser picks. That is a second download of
+     a 200 kB photograph, and it warns about it in the console. -->
+<link rel="preload" as="image" type="image/avif" href="campaign/assets/hero-m-375.avif" media="(max-width: 899px)">
+<link rel="preload" as="image" type="image/avif" media="(min-width: 900px)"
+      imagesrcset="campaign/assets/hero-1280.avif 1280w, campaign/assets/hero-1920.avif 1920w"
+      imagesizes="100vw">
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/roboto-cyrillic.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/roboto-latin.woff2" crossorigin>
+
+<!-- Order matters: reset, then tokens, then the shell, then the campaign.
+     css/stage.css is OPTIONAL — uncomment it for a full-screen page that never
+     scrolls. Leave it out for an ordinary scrolling landing page. See the top
+     of that file. -->
+<link rel="stylesheet" href="css/reset.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/shell.css">
+<link rel="stylesheet" href="css/form.css">
+<link rel="stylesheet" href="css/stage.css">
+<link rel="stylesheet" href="campaign/main.css">
+
+<noscript><style>
+  /* With scripting off there are no cards to turn, so the claim button is the
+     only way to the form -- and js/shell.js has not built the dialog either,
+     which is what the message below says. */
+  .cmp-claim { display: block; }
+
+  /* The chrome and the dialog are injected by js/shell.js, so with scripting
+     off there is no header, no footer and no form. Say so rather than showing
+     a blank page — this is the honest floor, not a fallback experience. */
+  .tw-noscript {
+    margin: 0 auto;
+    padding: 48px 24px;
+    max-width: 40rem;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 18px;
+    line-height: 1.5;
+    text-align: center;
+  }
+</style></noscript>
 </head>
 <body>
 
-<div class="fc-root">
+<!-- ═══ the shell ═══════════════════════════════════════════════
+     js/shell.js replaces these two markers with the header and the footer,
+     and appends the registration <dialog> to <body>. Do not put markup inside
+     them and do not rename the attributes: tools/smoke.py asserts that both
+     bars mounted and have a real box.
 
-  <main class="fc-hero">
+     Under css/stage.css these are two of exactly three body children, and any
+     fourth becomes a fourth flex row. -->
 
-    <picture class="fc-hero__bg">
-      <!-- Order matters: both desktop entries carry media and come first,
-           the mobile crop follows with none. First match wins, so reversing
-           this makes every desktop visitor download the 375px mobile image. -->
-      <source media="(min-width: 900px)" type="image/avif"
-              srcset="assets/img/hero-1280.avif 1280w, assets/img/hero-1920.avif 1920w"
-              sizes="100vw">
-      <source media="(min-width: 900px)" type="image/webp"
-              srcset="assets/img/hero-1280.webp 1280w, assets/img/hero-1920.webp 1920w"
-              sizes="100vw">
-      <source type="image/avif" srcset="assets/img/hero-m-375.avif">
-      <source type="image/webp" srcset="assets/img/hero-m-375.webp">
-      <img src="assets/img/hero-1280.webp" alt="" width="1920" height="1080"
-           fetchpriority="high" decoding="async">
-    </picture>
+<div data-tw="header"></div>
 
-    <div class="fc-stage">
+<!-- ═══ the campaign ════════════════════════════════════════════
+     THIS IS THE PART YOU REPLACE. Everything inside <main> belongs to
+     campaign/main.js and campaign/main.css.
 
-      <div class="fc-copy">
-        <div class="fc-plate">
-          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="255" height="46">
+     Static markup here is the page's first paint and its largest contentful
+     element, so put the hero in the HTML rather than building it from script.
+     Strings carry data-i18n="key" and are rendered from the campaign `strings`
+     table in campaign.js; the text written inline is the default locale's, so
+     the right words paint before any script runs. -->
+
+<main id="tw-main">
+  <section class="cmp-root">
+    <div class="cmp-hero">
+
+      <picture class="cmp-hero__bg">
+        <!-- Order matters: both desktop entries carry media and come first,
+             the mobile crop follows with none. First match wins, so reversing
+             this makes every desktop visitor download the 375px image. -->
+        <source media="(min-width: 900px)" type="image/avif"
+                srcset="campaign/assets/hero-1280.avif 1280w, campaign/assets/hero-1920.avif 1920w"
+                sizes="100vw">
+        <source media="(min-width: 900px)" type="image/webp"
+                srcset="campaign/assets/hero-1280.webp 1280w, campaign/assets/hero-1920.webp 1920w"
+                sizes="100vw">
+        <source type="image/avif" srcset="campaign/assets/hero-m-375.avif">
+        <source type="image/webp" srcset="campaign/assets/hero-m-375.webp">
+        <img src="campaign/assets/hero-1280.webp" alt="" width="1920" height="1080"
+             fetchpriority="high" decoding="async">
+      </picture>
+
+      <div class="cmp-stage">
+
+        <!-- The logo plate this block used to open with is gone: css/shell.css
+             puts the mark in the header bar now, and two logos on one screen
+             is not the design being honoured, it is the design being doubled. -->
+        <div class="cmp-copy">
+          <h1 class="cmp-headline">
+            <span class="cmp-headline__a" data-i18n="hero.1">Переверни картки</span>
+            <span class="cmp-headline__b" data-i18n="hero.2">забери свій бонус!</span>
+          </h1>
         </div>
-        <h1 class="fc-headline">
-          <span class="fc-headline__a" data-i18n="hero.1">Переверни картки</span>
-          <span class="fc-headline__b" data-i18n="hero.2">забери свій бонус!</span>
-        </h1>
+
+        <section class="cmp-game" aria-labelledby="cmp-game-label">
+          <h2 class="tw-sr-only" id="cmp-game-label" data-i18n="game.label">Переверніть три картки та заберіть вітальний бонус</h2>
+
+          <!-- The nine cards are built by campaign/main.js from the losing
+               tiers in campaign.js § deck and the offer above it. Their prizes
+               are shuffled on every load, their positions never are. -->
+          <ul class="cmp-grid" id="cmp-grid"></ul>
+
+          <div class="cmp-progress" id="cmp-progress" aria-hidden="true">
+            <span class="cmp-pip"></span><span class="cmp-pip"></span><span class="cmp-pip"></span>
+          </div>
+
+          <p class="tw-sr-only" id="cmp-status" role="status" aria-live="polite"></p>
+
+          <button class="cmp-claim" id="cmp-claim" type="button" data-i18n="cta.claim">Забрати бонус</button>
+        </section>
+
       </div>
-
-      <section class="fc-game" aria-labelledby="fc-game-label">
-        <h2 class="fc-sr" id="fc-game-label" data-i18n="game.label">Переверніть три картки та заберіть вітальний бонус</h2>
-
-        <!-- The nine cards are built by js/flip.js from CONFIG.deck. Their
-             prizes are shuffled on every load, their positions never are. -->
-        <ul class="fc-grid" id="fc-grid"></ul>
-
-        <div class="fc-progress" id="fc-progress" aria-hidden="true">
-          <span class="fc-pip"></span><span class="fc-pip"></span><span class="fc-pip"></span>
-        </div>
-
-        <p class="fc-sr" id="fc-status" role="status" aria-live="polite"></p>
-
-        <button class="fc-claim" id="fc-claim" type="button" data-i18n="cta.claim">Забрати бонус</button>
-      </section>
-
     </div>
-  </main>
+  </section>
+</main>
 
-  <footer class="fc-footer">
-    <div class="fc-footer__in">
+<div data-tw="footer"></div>
 
-      <div class="fc-fgroup">
-        <p class="fc-flabel" data-i18n="footer.payments">Способи оплати</p>
-        <div class="fc-frow">
-          <span class="fc-pay"><img src="assets/img/icons/pay-visa.svg" alt="Visa" width="74" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-mastercard.svg" alt="Mastercard" width="39" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-tether.svg" alt="Tether" width="24" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-bitcoin.svg" alt="Bitcoin" width="24" height="24"></span>
-        </div>
-      </div>
+<noscript>
+  <p class="tw-noscript">Для роботи сторінки потрібен JavaScript.<br>
+     This page needs JavaScript.</p>
+</noscript>
 
-      <div class="fc-divider"></div>
+<!-- ═══ scripts ═════════════════════════════════════════════════
+     `defer` keeps source order and runs everything before DOMContentLoaded,
+     which is the whole reason there is no bundler here: the order below IS the
+     dependency graph.
 
-      <div class="fc-footer__bottom">
-        <span class="fc-footer__logo">
-          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="96" height="17">
-        </span>
-        <p data-i18n="footer.rights">© 2026 Усі права захищені</p>
-      </div>
+       campaign.js       the config every other file reads
+       js/strings.js     the shell's copy and the locale table
+       js/i18n.js        the translation engine, reads both of the above
+       js/form.js        the dialog's behaviour
+       js/shell.js       builds the chrome and the dialog, then boots i18n
+       campaign/main.js  the mechanic, which only sees TW.ready()
 
-    </div>
-  </footer>
+     A campaign adds its own <script defer> AFTER campaign/main.js. -->
+<script defer src="campaign.js"></script>
+<script defer src="js/strings.js"></script>
+<script defer src="js/i18n.js"></script>
+<script defer src="js/form.js"></script>
+<script defer src="js/shell.js"></script>
+<script defer src="campaign/main.js"></script>
 
-  <!-- ======================================================================
-       Registration form.
-
-       IT: this is the piece you wire up. Two ways, pick one:
-         A. set action and method on this form and the browser submits it
-         B. leave action empty and set CONFIG.onRegister in js/flip.js
-       With neither, nothing is sent and the payload goes to the console.
-       See README.md section 2.
-       ====================================================================== -->
-  <dialog class="fc-modal" id="fc-signup" aria-labelledby="fc-offer-title">
-
-    <button class="fc-close" id="fc-close" type="button" autofocus
-            aria-label="Закрити" data-i18n-aria="modal.close">&times;</button>
-
-    <form class="fc-form" id="fc-form" novalidate action="" method="post">
-
-      <img class="fc-form__logo" src="assets/img/logo-topwin.svg" alt="TopWin" width="247" height="44">
-
-      <div class="fc-offer">
-        <p class="fc-offer__title" id="fc-offer-title" data-i18n="form.title">Вітальний казино бонус</p>
-        <p class="fc-sr" data-i18n="form.offerSr">Бонус 250 тисяч гривень та 250 фріспінів</p>
-        <div class="fc-offer__lines" aria-hidden="true">
-          <span class="fc-offer__amount" data-i18n="form.amount">250.000 ₴</span>
-          <span class="fc-offer__spins">+ 250 FS</span>
-        </div>
-      </div>
-
-      <div class="fc-panel" id="fc-panel-signup">
-
-        <div class="fc-tabs" role="tablist" aria-label="Спосіб реєстрації">
-          <button class="fc-tab" type="button" role="tab" id="fc-tab-email"
-                  aria-controls="fc-panel-email" aria-selected="true"
-                  data-i18n="form.tabEmail">Email</button>
-          <button class="fc-tab" type="button" role="tab" id="fc-tab-phone"
-                  aria-controls="fc-panel-phone" aria-selected="false" tabindex="-1"
-                  data-i18n="form.tabPhone">Телефон</button>
-        </div>
-
-        <div class="fc-fields">
-
-          <div class="fc-field" id="fc-panel-email" role="tabpanel" aria-labelledby="fc-tab-email">
-            <label class="fc-sr" for="fc-email" data-i18n="form.emailLabel">Email</label>
-            <div class="fc-input">
-              <input id="fc-email" name="email" type="email" inputmode="email"
-                     autocomplete="email" placeholder="Email"
-                     data-i18n-placeholder="form.emailHint"
-                     aria-describedby="fc-err-email">
-              <span class="fc-ok" aria-hidden="true"><img src="assets/img/icons/icon-check.svg" alt="" width="10" height="10"></span>
-            </div>
-            <p class="fc-error" id="fc-err-email" role="alert"></p>
-          </div>
-
-          <div class="fc-field" id="fc-panel-phone" role="tabpanel" aria-labelledby="fc-tab-phone" hidden>
-            <label class="fc-sr" for="fc-phone" data-i18n="form.phoneLabel">Телефон, код країни +380</label>
-            <div class="fc-input">
-              <span class="fc-input__flag" aria-hidden="true"><img src="assets/img/icons/flag-ua.svg" width="18" height="18" alt=""></span>
-              <span class="fc-input__dial" aria-hidden="true">+380</span>
-              <input id="fc-phone" name="phone" type="tel" inputmode="numeric"
-                     autocomplete="tel-national" placeholder="00 000 0000"
-                     aria-describedby="fc-err-phone">
-              <span class="fc-ok" aria-hidden="true"><img src="assets/img/icons/icon-check.svg" alt="" width="10" height="10"></span>
-            </div>
-            <p class="fc-error" id="fc-err-phone" role="alert"></p>
-          </div>
-
-          <div class="fc-field">
-            <label class="fc-field__label" for="fc-password" data-i18n="form.passLabel">Пароль</label>
-            <div class="fc-input">
-              <input id="fc-password" name="password" type="password"
-                     autocomplete="new-password" placeholder="Введіть пароль"
-                     data-i18n-placeholder="form.passHint"
-                     aria-describedby="fc-err-password">
-              <button class="fc-eye" id="fc-eye" type="button" aria-pressed="false"
-                      aria-controls="fc-password" aria-label="Показати пароль"
-                      data-i18n-aria="form.showPass">
-                <img src="assets/img/icons/icon-eye.svg" alt="" width="20" height="20">
-              </button>
-              <span class="fc-ok" aria-hidden="true"><img src="assets/img/icons/icon-check.svg" alt="" width="10" height="10"></span>
-            </div>
-            <p class="fc-error" id="fc-err-password" role="alert"></p>
-          </div>
-
-        </div>
-
-        <div class="fc-consent" id="fc-consent-row">
-          <input id="fc-consent" name="consent" type="checkbox" aria-describedby="fc-err-consent">
-          <label class="fc-consent__box" for="fc-consent">
-            <img src="assets/img/icons/icon-check.svg" alt="" width="10" height="10">
-          </label>
-          <label for="fc-consent" data-i18n="form.consent">Мені 18 років, і я приймаю
-            <a href="#" id="fc-terms">Умови Використання</a> та
-            <a href="#" id="fc-privacy">Політику конфіденційності</a>.
-          </label>
-        </div>
-        <p class="fc-error fc-error--consent" id="fc-err-consent" role="alert"></p>
-
-        <div class="fc-actions">
-          <button class="fc-submit" type="submit" data-i18n="form.submit">Зареєструватись</button>
-          <p class="fc-signin" data-i18n="form.haveAccount">Вже є акаунт?
-            <a href="#" id="fc-login">Увійти</a>
-          </p>
-        </div>
-
-      </div>
-
-      <!-- The confirmation screen. Same shell, same logo, same offer block —
-           only the body below them swaps. IT: fill it and show it with
-           TWFlip.showDone({ login: '…', password: '…' }). README section 3. -->
-      <div class="fc-panel fc-done" id="fc-panel-done" hidden>
-
-        <div class="fc-rule"></div>
-
-        <h2 class="fc-done__title" id="fc-done-title" tabindex="-1" data-i18n="done.title">Реєстрація успішна!</h2>
-
-        <div class="fc-creds">
-          <div class="fc-cred" id="fc-cred-login">
-            <span class="fc-cred__key" data-i18n="done.login">Логін:</span>
-            <span class="fc-cred__val" id="fc-done-login"></span>
-            <button class="fc-cred__copy" type="button" data-copy="fc-done-login"
-                    aria-label="Скопіювати логін" data-i18n-aria="done.copyLogin">
-              <img src="assets/img/icons/icon-copy.svg" alt="" width="20" height="20">
-            </button>
-          </div>
-          <div class="fc-rule"></div>
-          <div class="fc-cred" id="fc-cred-pass">
-            <span class="fc-cred__key" data-i18n="done.passLabel">Пароль:</span>
-            <span class="fc-cred__val" id="fc-done-pass"></span>
-            <button class="fc-cred__copy" type="button" data-copy="fc-done-pass"
-                    aria-label="Скопіювати пароль" data-i18n-aria="done.copyPass">
-              <img src="assets/img/icons/icon-copy.svg" alt="" width="20" height="20">
-            </button>
-          </div>
-        </div>
-
-        <div class="fc-actions">
-          <a class="fc-submit" id="fc-go" href="#" data-i18n="done.cta">Перейти на сайт</a>
-          <p class="fc-signin" data-i18n="done.hint">Збережіть ваші дані для входу</p>
-        </div>
-
-        <p class="fc-sr" id="fc-copy-status" role="status" aria-live="polite"></p>
-
-      </div>
-
-    </form>
-  </dialog>
-
-</div>
-
-<script src="js/flip.js" defer></script>
 </body>
 </html>

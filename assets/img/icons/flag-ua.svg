@@ -1,4 +1,6 @@
-<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
-<path d="M2.5 4.5C2.5 3.94772 2.94772 3.5 3.5 3.5H14.5C15.0523 3.5 15.5 3.94772 15.5 4.5V9H2.5V4.5Z" fill="#0057B7"/>
-<path d="M2.5 9H15.5V13.5C15.5 14.0523 15.0523 14.5 14.5 14.5H3.5C2.94772 14.5 2.5 14.0523 2.5 13.5V9Z" fill="#FFD700"/>
+<svg xmlns="http://www.w3.org/2000/svg" id="flag-icons-ua" viewBox="0 0 640 480">
+  <g fill-rule="evenodd" stroke-width="1pt">
+    <path fill="gold" d="M0 0h640v480H0z"/>
+    <path fill="#0057b8" d="M0 0h640v240H0z"/>
+  </g>
 </svg>

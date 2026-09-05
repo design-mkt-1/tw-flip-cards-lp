@@ -1,0 +1,70 @@
+/* Top Win shell reset.
+
+   Global on purpose: a campaign landing page owns its whole document. If a
+   clone is ever embedded inside the real platform instead of deployed as its
+   own page, delete the `html, body` rule below -- it is the only rule here
+   that reaches outside the shell -- and leave the rest. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+* { margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img, svg { display: block; max-width: 100%; }
+
+/* `* { padding: 0 }` above removes the indent but NOT the marker, and a
+   marker on a campaign's own list is the bug that reads as a broken layout:
+   nine cards on a grid, each with a white dot beside it. css/shell.css sets
+   this on its own two lists and kept its own counsel about everyone else's,
+   so every campaign that used a <ul> found it the same way. */
+ul, ol { list-style: none; }
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+input, select { font: inherit; color: inherit; }
+
+a { color: inherit; text-decoration: none; }
+
+[hidden] { display: none !important; }
+
+/* Available to a screen reader, absent from the page. Not `display: none` and
+   not `visibility: hidden`: both take the text out of the accessibility tree
+   too, which is the one thing it is here for. The 1px clipped box is the
+   long-standing form that survives every engine.
+
+   Used by the card's field labels, where the design puts the word inside the
+   box as a placeholder -- and a placeholder is not a name, and leaves with the
+   first keystroke. */
+.tw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

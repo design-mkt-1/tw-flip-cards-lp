@@ -1,17 +1,21 @@
-name: Deploy to GitHub Pages
-
-# A preview URL for stakeholders. It is not the production deploy — the IT
-# team integrates these files into the real platform.
+# Guards on every push and every pull request; build and deploy only on main.
 #
-# Only the files the page actually serves are uploaded. raw/ holds the
-# untouched Figma exports that tools/optimize.py consumes, and neither is
-# ever requested by a browser.
+# The order matters and is not cosmetic. In the landing this workflow is taken
+# from, the guards lived inside the build job, which only ran after a merge --
+# so every guard reported a problem that was already on main. That is how the
+# hryvnia bug reached production. They run on pull_request here for that reason.
+#
+# THE PAGES SOURCE MUST BE SET TO "GitHub Actions" in the repository settings.
+# Left on a branch, the legacy Jekyll builder succeeds and publishes the WHOLE
+# repository -- tools/, docs/, raw/ and all -- bypassing the allowlist below
+# entirely, and nothing here warns you.
+
+name: Pages
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -20,16 +24,11 @@ permissions:
   id-token: write
 
 concurrency:
-  # Per ref, so a pull request cannot queue behind a deploy of main, and two
-  # open pull requests do not serialise against each other.
   group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # The checks run on pull requests as well as pushes. They used to live inside
-  # build, which only ran after a merge, so every guard here reported a problem
-  # that was already on main. The hryvnia font bug reached production that way.
-  parity:
+  guards:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,90 +37,55 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: The three language files must stay structurally identical
+      - name: Install the guards' dependencies
         run: |
-          for f in index.html ru.html en.html; do
-            printf '%s: %s lines, %s tags\n' "$f" "$(wc -l < $f)" "$(grep -o '<' $f | wc -l)"
-          done
-          a=$(grep -o '<' index.html | wc -l)
-          for f in ru.html en.html; do
-            b=$(grep -o '<' $f | wc -l)
-            if [ "$a" != "$b" ]; then
-              echo "::error::$f has $b tags, index.html has $a. The files have drifted."
-              echo "Compare them with: git diff --no-index --word-diff index.html $f"
-              exit 1
-            fi
-          done
+          python -m pip install --upgrade pip
+          python -m pip install fonttools brotli playwright
+          python -m playwright install --with-deps chromium
 
-      - name: The tag sequences must match, element for element
-        run: |
-          python3 - <<'PY'
-          import re, io
-          seq = lambda p: re.findall(r'</?([a-zA-Z][\w-]*)', io.open(p, encoding='utf-8').read())
-          a = seq('index.html')
-          for f in ('ru.html', 'en.html'):
-              b = seq(f)
-              if a != b:
-                  i = next(i for i, (x, y) in enumerate(zip(a + [None] * 9, b + [None] * 9)) if x != y)
-                  raise SystemExit(
-                      '::error::%s diverges at tag #%d: index.html has <%s>, %s has <%s>. '
-                      'Compare them with: git diff --no-index --word-diff index.html %s'
-                      % (f, i, a[i], f, b[i], f))
-          print('tag sequences match: %d tags' % len(a))
-          PY
+      # The shared files are the template. A campaign clone that has edited one
+      # of them has forked, which is the failure this whole repo exists to stop.
+      - name: drift — the shared files are unchanged
+        run: python tools/drift.py
 
-      # Roboto has no hryvnia sign. Nobody noticed when the cards were redrawn
-      # in hryvnia, because a missing glyph still renders in a fallback face.
-      # This is the check that would have caught it.
-      - name: Every character the page renders must exist in the shipped fonts
-        run: |
-          python3 -m pip install --quiet fonttools brotli
-          python3 tools/fonts.py --check
+      # Colours live in css/tokens.css and nowhere else. This is the guard that
+      # would have caught every colour divergence in this project's history.
+      - name: tokens — no colour literal outside tokens.css
+        run: python tools/tokens.py --check
 
-  # parity reads the files; this one looks at the rendered page. The class of
-  # bug it exists for is invisible to every text check: a `display: flex` that
-  # was never scoped to [open] left the CLOSED dialog in flow, so the site
-  # opened at its own footer with 650px of blank page under it, and CI was
-  # green the whole time.
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      # A missing glyph renders as something, from a face nobody chose. Run
+      # after the final copy, which is why it is a gate and not a checklist item.
+      - name: fonts — every rendered character exists in a shipped face
+        run: python tools/fonts.py --check
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: The pages must open at the top, with nothing left in flow below the footer
-        run: |
-          python3 -m pip install --quiet playwright
-          python3 -m playwright install --with-deps chromium
-          python3 tools/smoke.py
+      # A real browser, every viewport, every language. Catches what no text
+      # check can see.
+      - name: smoke — the page works
+        run: python tools/smoke.py
 
   build:
-    needs: [parity, smoke]
-    # A pull request gets the checks above and stops there. Only main is built
-    # and deployed; configure-pages and upload-pages-artifact have no business
-    # running on a branch that nobody has merged yet.
+    needs: guards
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # An explicit allowlist, never `cp -r .`. tools/, docs/, raw/ and the
+      # dotfiles must 404 on the live URL, and a copy-everything build is one
+      # careless commit away from publishing whatever lands in the repo.
       - name: Stage the served files
         run: |
           mkdir -p _site
-          cp -r index.html ru.html en.html .nojekyll css js assets _site/
-          du -sh _site
+          cp -r index.html campaign.js .nojekyll css js campaign assets _site/
 
       - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -1,0 +1,791 @@
+/* Top Win registration dialog — the card every campaign shares.
+
+   Figma mAJyDSaXdr9GO72b7FGvI8, page 19:2893: mobile 19:4559 (360 wide) and
+   desktop 19:4675 (504 wide), each read from its own node rather than one
+   scaled from the other. The desktop card is not a larger mobile card -- its
+   padding goes 24 -> 36, its logo 101x18 -> 247x44 and its promo type
+   16/84/34 -> 24/100/44, while the tabs, the fields, the checkbox and the
+   button keep their mobile sizes exactly. Only the parts the design actually
+   changes are in the wide query at the bottom. The error and success states
+   are 19:4596 and 19:4635; the phone tab is 19:4431, which is the same eight
+   screens drawn with the other tab active rather than an older revision;
+   registration complete is 19:4827.
+
+   LAYOUT NEUTRALITY IS THE WHOLE POINT OF THIS FILE, as it is for shell.css.
+
+   The card is a native <dialog> opened with showModal(), so it lives in the
+   top layer: it is not inside the campaign's stage, it is not affected by the
+   stage's transforms or z-index, and it is measured against the VIEWPORT, not
+   against whatever box a mechanic happens to draw itself in. That is also why
+   the card's two geometries are a plain `@media (min-width: 480px)` and not a
+   container query -- there is no container to query. The version this replaces
+   put `container: card / inline-size` on an absolutely positioned overlay and
+   then had to explain, twice, that an element cannot be styled by its own
+   container query and that a container is measured by its content box, so a
+   504px card with 24px of padding queries as 454 and never matches a 480
+   threshold at all. In the top layer none of that arises.
+
+   There is no cqh, no cqw, no @container, no --u and no vh/svh/dvh anywhere
+   below. From tw-flip-cards-lp/css/styles.css:906-911, which paid for both
+   halves of the rule:
+
+     "Fixed pixels throughout. Viewport units here would break browser zoom,
+      and any input below 16px makes iOS Safari zoom the page on focus."
+
+   So every length a visitor reads is px or rem, and every `input` is at
+   least 16px -- including the ones the design draws at 15.
+
+   Colours come from css/tokens.css only. There is not one hex literal here
+   and tools/tokens.py --check enforces that. Where the design uses a colour
+   the brandbook has no name for, it is routed to the nearest token rather
+   than copied in -- the 18+ checkbox is filled with a green a shade lighter
+   than the brandbook's, which the links beside it use correctly, and the
+   error border is drawn in two different reds on the email and the password
+   field in the same screenshot. One green, --green. One red, --danger. If
+   any of those is ever confirmed as deliberate it wants a name in
+   tokens.css, not a literal here. The exact values are in the report that
+   came with this file and in raw/, never in a stylesheet.
+
+   Three of the values this file needs -- --scrim, --shadow-card and
+   --shadow-cta -- are shadows, and a shadow is a colour: they are named in
+   css/tokens.css rather than written here. See the note at each. */
+
+
+/* ══ the dialog ═══════════════════════════════════════════════
+   The shell: the scroll container, the scrim and the entry. Nothing that a
+   visitor reads is styled here -- that is all on .tw-card below. */
+
+.tw-dialog {
+  /* The browser's own `dialog:not([open]) { display: none }` is a bare
+     element selector, so a `display: flex` here would quietly beat it and
+     leave the CLOSED dialog in normal flow: 650px of apparent emptiness under
+     the footer, and a close button that, being rendered, fires its `autofocus`
+     and scrolls the page to the bottom on load. The flex belongs to [open].
+     Same trap as the [hidden] guard in reset.css. */
+  display: none;
+  flex-direction: column;
+
+  /* The two Figma artboard widths. 360 is the card in the 375 mobile frame,
+     not 343: the design sits it at x=7. Below 384 the 24px of backdrop kept
+     on either side wins, so the card shrinks instead of hanging off the
+     screen. calc(100% - 24px), not 100vw: a modal dialog is fixed-positioned
+     in the top layer, so a percentage already resolves against the viewport,
+     and unlike 100vw it does not count the scrollbar. */
+  width: min(360px, calc(100% - 24px));
+  max-width: none;
+  margin: auto;
+
+  /* The dialog scrolls, not the card, and the close button is a sticky
+     sibling of the card rather than a child of it. Move the scrolling onto
+     the form and the close button scrolls away with the content; a phone held
+     sideways leaves about 360px of height, less than half of what this form
+     needs, and a visitor with no Escape key and almost no backdrop to tap is
+     then stuck. Percentage again, for the reason above -- it tracks the
+     viewport the way svh would, without a banned unit. */
+  max-height: calc(100% - 32px);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+
+  padding: 0;
+  border: 0;
+  background: transparent;
+
+  opacity: 0;
+  transform: scale(.96) translateY(8px);
+  transform-origin: center;
+  /* allow-discrete on overlay and display is what lets a top-layer element
+     animate out at all: without it the dialog is removed from the top layer
+     the instant close() runs and the exit never renders. */
+  transition:
+    opacity   280ms var(--ease-out) 60ms,
+    transform 280ms var(--ease-out) 60ms,
+    overlay   280ms allow-discrete,
+    display   280ms allow-discrete;
+}
+
+.tw-dialog[open] { display: flex; opacity: 1; transform: scale(1) translateY(0); }
+
+/* The first frame the open dialog is painted in. Without it the browser has
+   no "before" to interpolate from and the panel simply appears. */
+@starting-style {
+  .tw-dialog[open] { opacity: 0; transform: scale(.96) translateY(8px); }
+}
+
+/* The 60ms lead on the panel above means the room dims first, then the thing
+   arrives. One property, and it is the whole difference between a modal
+   appearing and a modal being presented.
+
+   --scrim is --navy-950 at 72%. --chrome-bar carries the same alpha and is
+   within three points of the same colour, and the dialog is deliberately NOT
+   pointed at it: the header bar and the scrim are two surfaces, and naming one
+   after the other is how a value stops tracking the thing it belongs to. */
+.tw-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(10px) saturate(115%);
+  -webkit-backdrop-filter: blur(10px) saturate(115%);
+  opacity: 0;
+  transition: opacity 220ms var(--ease-out),
+              overlay 220ms allow-discrete,
+              display 220ms allow-discrete;
+}
+
+.tw-dialog[open]::backdrop { opacity: 1; }
+
+@starting-style {
+  .tw-dialog[open]::backdrop { opacity: 0; }
+}
+
+/* Leaving is faster than arriving and the scrim goes last -- the same rule
+   the language menu in shell.css follows. The visitor has already decided; a
+   slow exit reads as an obstacle. The durations live on the open state and on
+   this one, so nothing has to be restated. */
+.tw-dialog:not([open]) {
+  transition-duration: 160ms;
+  transition-delay: 0ms;
+  transform: scale(.98);
+}
+
+.tw-dialog:not([open])::backdrop { transition-delay: 40ms; }
+
+
+/* ══ close button ═════════════════════════════════════════════
+   The Figma node has none. It ships anyway: Escape is not discoverable on
+   touch, and a card that is 24px short of full-bleed leaves almost no
+   backdrop left to tap. */
+
+.tw-close {
+  /* Sticky, and a sibling of the form rather than a child of it, so it holds
+     its corner however far the card is scrolled. The negative bottom margin
+     cancels the 52px row it would otherwise occupy, which is what keeps the
+     card starting at the top of the dialog exactly as it does without it. */
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  /* flex: none, or the column's overflow makes the button a shrinkable item
+     and it collapses to the height of its own glyph. */
+  flex: none;
+  align-self: flex-end;
+  margin: 8px 8px -52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  color: var(--txt-secondary);
+  font-size: 22px;
+  line-height: 1;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.tw-close:hover { background: var(--surface-field); color: var(--second); }
+.tw-close svg { width: 18px; height: 18px; }
+
+
+/* ══ card shell ═══════════════════════════════════════════════ */
+
+.tw-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  /* Content sits 24 from the edge on mobile, 36 on desktop. The card's 1px
+     stroke is drawn as an inset ring rather than a border: with border-box a
+     border would eat into that padding and drop the desktop content box from
+     432 to 430, and Figma's own numbers say it does not -- 504 - 72 = 432. */
+  padding: 24px;
+  border-radius: var(--r-xl);
+  background: var(--white);
+  /* --shadow-card is a 12/12 drop of Midnight Navy at 8% -- a real shadow
+     under the card, not the --glow-second halo, which is a different thing for
+     a different surface. */
+  box-shadow: var(--shadow-card), inset 0 0 0 1px var(--stroke);
+  font-family: var(--font);
+}
+
+/* The sign-up body and the confirmation body. The logo and the offer block
+   sit above both and are shared -- the design keeps the whole promo block on
+   the complete screen (19:4830) -- so the swap is one `hidden` attribute and
+   the dialog is never reopened. */
+.tw-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+
+/* ══ promo header ═════════════════════════════════════════════ */
+
+.tw-promo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: center;
+}
+
+.tw-promo__logo { width: 101px; height: 18px; }
+
+.tw-promo__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* The numerals and the amount are one group under the title. Flush on mobile,
+   14 apart on desktop -- the only gap the two nodes disagree about. */
+.tw-promo__offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+
+/* One family, one coordinate: Roboto at wdth 75, weight 900, italic. Named
+   through the token so the three lines cannot drift apart from each other or
+   from the rest of the page. font-synthesis: none because tokens.css ships
+   the real italic and the real width axis -- if a face ever goes missing the
+   line should fail visibly rather than arrive faux-slanted and pass review. */
+.tw-promo__title,
+.tw-promo__pct,
+.tw-promo__sub {
+  font-weight: var(--fw-black);
+  font-stretch: var(--font-stretch-tight);
+  font-style: italic;
+  font-synthesis: none;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.tw-promo__title { font-size: 16px; color: var(--second); }
+.tw-promo__pct   { font-size: 84px; color: var(--accent); }
+.tw-promo__sub   { font-size: 34px; color: var(--second); }
+
+/* Below the 360 the card is drawn at, the numerals stop fitting: a 320px
+   phone leaves 296 of card and 248 of content, against the 312 the design's
+   own figure assumes. Fixed steps rather than a fluid clamp, because these
+   are the sizes a visitor reads and browser zoom has to move them. */
+@media (max-width: 359px) {
+  .tw-promo__title { font-size: 15px; }
+  .tw-promo__pct   { font-size: 68px; }
+  .tw-promo__sub   { font-size: 28px; }
+}
+
+
+/* ══ tabs ═════════════════════════════════════════════════════
+   Not a segmented pill: two labels on a rule, the active one navy over a
+   36x3 bar.
+
+   The state hook is aria-selected, not a class. The markup carries it anyway
+   -- a role="tab" without it is broken for a screen reader -- and one source
+   of truth cannot get out of step with itself the way a class beside it can. */
+
+.tw-tabs {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  width: 100%;
+  /* An inset shadow, not a border: Figma's 26px tab frame already contains
+     the rule, and a border would add a 27th pixel. */
+  box-shadow: inset 0 -1px 0 var(--stroke);
+}
+
+/* The drawn tab is 26px tall -- 15px of type, the 8px gap and the 3px bar --
+   which is a small thing to hit with a thumb. The hit area is grown to 44
+   without moving anything: a transparent ::before reaching upward over the
+   promo block, which has nothing to click. Sideways it takes 8 of the 24px
+   gap on each side, so the two targets stay 8px apart. */
+.tw-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--txt-secondary);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 18px;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  transition: color 160ms ease;
+}
+
+.tw-tab::before {
+  content: "";
+  position: absolute;
+  inset: -16px -8px 0;
+}
+
+/* The bar is always in the layout, so switching tabs cannot move the rule it
+   sits on by 3px. Only its colour changes. */
+.tw-tab::after {
+  content: "";
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color 160ms ease;
+}
+
+.tw-tab[aria-selected="true"] { color: var(--second); }
+.tw-tab[aria-selected="true"]::after { background: var(--second); }
+
+/* Which tab is active is carried by a colour and a colour-filled bar, and
+   forced-colors discards both: background-color is replaced by the user's own
+   and every tab's text lands on the same CanvasText, so EMAIL and ТЕЛЕФОН
+   become indistinguishable. Borders survive the mode -- recoloured, but drawn
+   -- so the bar is redrawn as one. Highlight is the system colour for a
+   selected thing, which is what this is.
+
+   Reasoned from the spec rather than observed: real Windows High Contrast is
+   the one check that cannot be run from this desk. */
+@media (forced-colors: active) {
+  .tw-tab[aria-selected="true"]::after {
+    height: 0;
+    border-top: 3px solid Highlight;
+  }
+}
+
+
+/* ══ fields ═══════════════════════════════════════════════════ */
+
+.tw-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tw-field { display: flex; flex-direction: column; gap: 6px; }
+
+.tw-label {
+  color: var(--txt-secondary);
+  font-size: 13px;
+  font-weight: var(--fw-semi);
+}
+
+/* The shell IS the label, not a div wrapped around one. A placeholder is not
+   an accessible name and it leaves with the first keystroke; a div shell
+   means only the 17px of the input itself is a tap target while 48px of it
+   looks like one. As a <label> both are answered at once -- the whole box
+   names the field and focuses it -- and the word the design draws inside the
+   box stays the placeholder, with a .tw-sr-only name behind it. */
+.tw-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px;
+  border: 1.5px solid var(--stroke);
+  border-radius: 10px;
+  background: var(--surface-field);
+  transition: border-color 180ms ease;
+}
+
+.tw-input input {
+  flex: 1 0 0;
+  min-width: 0;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--txt-main);
+  font-family: inherit;
+  /* 16, where the design draws 15. Never below 16: iOS Safari zooms the whole
+     page on focus otherwise, and a zoomed page cannot be zoomed back by the
+     visitor. One pixel against a form that has to be pinched out of. */
+  font-size: 16px;
+  font-weight: var(--fw-medium);
+}
+
+.tw-input input::placeholder {
+  color: var(--txt-secondary);
+  opacity: 1;   /* Firefox dims placeholders by default; the design does not. */
+}
+
+/* The phone field carries the country in front of the input rather than in a
+   picker: the offer is Ukraine-only and the design fixes +380 as text. The
+   flag is the flag-icons SVG the language menu already uses -- the design
+   draws the emoji, which renders as the letters UA on Windows and would not
+   match the flags eight lines up the page. */
+.tw-input--phone { gap: 8px; }
+
+.tw-input__flag {
+  flex: none;
+  width: 24px;
+  height: 18px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--white);
+}
+
+.tw-input__prefix {
+  flex: none;
+  color: var(--txt-main);
+  font-size: 15px;
+  font-weight: var(--fw-medium);
+}
+
+/* The reveal toggle. A button, not an icon on a div: it is the one control in
+   the field that is not the input, and it has to be reachable by Tab. */
+.tw-eye {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: opacity 160ms ease;
+}
+
+/* The icon stays 20px, the target becomes 44. It overhangs the field's right
+   padding, which holds nothing else. */
+.tw-eye::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+
+/* flex: none on the image too, or the row squeezes it to 16 wide and the SVG,
+   which carries preserveAspectRatio="none", squashes the eye into a ring. */
+.tw-eye img { flex: none; width: 20px; height: 20px; }
+.tw-eye[aria-pressed="true"] { opacity: .55; }
+
+/* The tick the design puts inside a valid password field, after the eye. It
+   is aria-hidden: the real state is aria-invalid on the input, and a live
+   region announcing "valid" would fire on every blur and say nothing that the
+   absence of an error does not already say. */
+.tw-ok {
+  display: none;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--green);
+}
+
+.tw-ok img { flex: none; width: 10px; height: 10px; }
+
+.tw-field[data-valid] .tw-ok    { display: grid; }
+.tw-field[data-valid] .tw-input { border-color: var(--green); }
+
+/* After the valid rules on purpose: equal specificity, so if both attributes
+   were ever written at once the field would still read as wrong, not as
+   right. */
+.tw-field[data-invalid] .tw-input { border-color: var(--danger); }
+
+/* The error line is `hidden` in the markup and reset.css forces
+   [hidden] { display: none !important }, which cannot be transitioned -- so
+   js unhides one frame ahead of adding .is-shown, the same two-step the
+   language menu uses. */
+.tw-err {
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: var(--fw-medium);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms var(--ease-out);
+}
+
+.tw-err.is-shown { opacity: 1; transform: none; }
+
+
+/* ══ 18+ consent ══════════════════════════════════════════════
+   The sentence is deliberately not a <label for>: it carries two links, and a
+   click on either would otherwise toggle the box on its way to the anchor.
+   The box names itself with aria-label and points at the sentence with
+   aria-describedby instead. */
+
+.tw-agree {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* 24, not the design's 20, and the tick scales with it. WCAG's target minimum
+   is 24x24 and this is the one control that could not reach it any other way:
+   pseudo-elements on an appearance:none input are not rendered by every
+   engine, so the ::before trick the tab and the reveal toggle use is not
+   available here. Four pixels on one checkbox is a smaller deviation than a
+   hit area that works in Chrome and not in Safari. */
+.tw-agree__box {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1.5px solid var(--stroke);
+  border-radius: 6px;
+  background: var(--white);
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.tw-agree__box:checked {
+  border-color: var(--green);
+  background: var(--green) url("../assets/img/icons/check.svg") center / 12px 12px no-repeat;
+}
+
+.tw-agree__text {
+  flex: 1 0 0;
+  min-width: 0;
+  color: var(--txt-secondary);
+  font-size: 13px;
+  font-weight: var(--fw-regular);
+  line-height: 18px;
+}
+
+/* The sentence up to the first link IS a real <label> for the box -- not the
+   whole sentence, for the reason above, but it makes the words next to a
+   24px box part of its target, which is what a thumb needs. */
+.tw-agree__text label { cursor: pointer; }
+
+/* [href] only, like the login link below: js/main.js supplies the two URLs,
+   and until it does these are not links and must not advertise themselves as
+   ones.
+   --green-on-light, not --green: the brandbook's 500 is 3.1:1 on white, under
+   AA for text this size. See the note in css/tokens.css. */
+.tw-agree__text a[href] {
+  color: var(--green-on-light);
+  font-weight: var(--fw-semi);
+  text-decoration: underline;
+}
+
+
+/* ══ actions ══════════════════════════════════════════════════ */
+
+.tw-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+}
+
+.tw-cta {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  /* --shadow-cta is a 4/6 drop of Orange Fire at 19% under the button.
+     --glow-accent is a 24px halo for the dark stage and is not this. */
+  box-shadow: var(--shadow-cta);
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  line-height: 20px;
+  text-transform: uppercase;
+  transition: filter 160ms ease, transform 120ms var(--ease-out);
+}
+
+.tw-cta:hover { filter: brightness(1.06); }
+.tw-cta:active { transform: scale(.985); }
+
+.tw-foot {
+  color: var(--txt-secondary);
+  font-size: 14px;
+  font-weight: var(--fw-medium);
+}
+
+/* --accent-on-light, not --accent: Orange Fire is 3.4:1 on white. */
+.tw-foot a {
+  color: var(--accent-on-light);
+  font-weight: var(--fw-bold);
+}
+
+.tw-foot a[href] { text-decoration: underline; }
+
+
+/* ══ registration complete ════════════════════════════════════
+   19:4827. The promo header stays; a rule, the success line, the credentials
+   box and the button replace the form below it. */
+
+.tw-rule {
+  width: 100%;
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--stroke);
+}
+
+/* Black Italic at wdth 100, not the condensed coordinate the promo uses --
+   19:4840 sets this one line back to the full width. It is the one place the
+   condensed axis is let go. */
+.tw-done__title {
+  color: var(--second);
+  font-size: 20px;
+  font-weight: var(--fw-black);
+  font-style: italic;
+  font-stretch: 100%;
+  font-synthesis: none;
+  line-height: 1.2;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Focus lands here when the screen swaps in, so that it is announced. A ring
+   on a heading nobody clicked reads as a rendering fault, so there is none --
+   and no :focus-visible rule either, since it is never reached by keyboard. */
+.tw-done__title:focus { outline: none; }
+
+.tw-creds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  background: var(--surface-field);
+}
+
+.tw-cred {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* The rule between the two rows is a border rather than the separate line
+   element the design draws, because <hr> is not allowed inside <dl>: the 12px
+   flex gap above it and the 12px padding below reproduce the same spacing the
+   design puts on either side of the line. */
+.tw-cred + .tw-cred {
+  padding-top: 12px;
+  border-top: 1px solid var(--stroke);
+}
+
+.tw-cred dt {
+  flex: none;
+  color: var(--txt-secondary);
+  font-size: 14px;
+  font-weight: var(--fw-semi);
+}
+
+.tw-cred dd {
+  margin: 0;
+  color: var(--txt-main);
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  /* Figma's value is a nowrap run between the label and the button, but a
+     login can be an email address, which is longer than anything drawn. Let
+     it shrink and ellipsize rather than push the copy button off the box. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two offset rounded rectangles, the geometry 19:4845 draws: 10.8 x 12.6 at
+   1.2 stroke, the front one offset by 4.5 and filled white so the back one
+   reads as a second sheet behind it. */
+.tw-copy {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--txt-secondary);
+  transition: color 160ms ease;
+}
+
+/* The drawn glyph is 18, which is under the 24x24 minimum the checkbox above
+   is enlarged to meet. Same fix as the tab and the reveal toggle: the icon
+   stays 18 and the target becomes 44. It overhangs the value beside it, which
+   is text and not a control. */
+.tw-copy::before {
+  content: "";
+  position: absolute;
+  inset: -13px;
+}
+
+.tw-copy svg { display: block; width: 18px; height: 18px; }
+.tw-copy:hover { color: var(--txt-main); }
+.tw-copy.is-copied { color: var(--green); }
+
+.tw-done__note {
+  color: var(--txt-secondary);
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  text-align: center;
+}
+
+/* The design puts 14 under the button here against the 16 the form step
+   uses. */
+.tw-done .tw-actions { gap: 14px; }
+
+
+/* ══ the wide card ════════════════════════════════════════════
+   19:4675, at the 480px the second artboard starts to fit. Everything not
+   named here is the same in both nodes. A media query, not a container query:
+   see the header. */
+
+@media (min-width: 480px) {
+  .tw-dialog { width: 504px; }
+
+  .tw-card { padding: 36px; }
+
+  .tw-promo { gap: 24px; }
+  .tw-promo__logo  { width: 247px; height: 44px; }
+  .tw-promo__title { font-size: 24px; }
+  .tw-promo__pct   { font-size: 100px; }
+  .tw-promo__sub   { font-size: 44px; }
+  /* The one gap the desktop node adds inside the head: 14 between the
+     numerals and the amount, where mobile stacks them flush. */
+  .tw-promo__offer { gap: 14px; }
+
+  .tw-done__title { font-size: 24px; }
+  .tw-creds { gap: 14px; padding: 20px; }
+  .tw-done .tw-actions { gap: 16px; }
+}
+
+
+/* ══ focus ════════════════════════════════════════════════════
+   showModal() moves focus into the dialog by itself, so nothing here has to
+   be focused by hand -- but everything a visitor can Tab onto has to say so. */
+
+.tw-dialog:focus,
+.tw-card:focus { outline: none; }
+
+.tw-close:focus-visible,
+.tw-tab:focus-visible,
+.tw-eye:focus-visible,
+.tw-copy:focus-visible,
+.tw-agree__box:focus-visible,
+.tw-cta:focus-visible,
+.tw-foot a:focus-visible,
+.tw-agree__text a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The input clears the browser's own outline above, so the ring goes on the
+   box you can see instead of the invisible text node inside it. */
+.tw-input:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

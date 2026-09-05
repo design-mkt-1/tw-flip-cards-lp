@@ -1,0 +1,167 @@
+/* Top Win — the no-scroll stage. OPTIONAL, and off unless a campaign asks.
+
+   Including this file turns the page into a fixed, full-screen stage: the
+   header and the footer keep their own intrinsic heights, #tw-main takes
+   whatever they leave, and nothing scrolls -- in any state, at any size, in
+   either orientation. One line in the campaign's index.html buys it:
+
+     <link rel="stylesheet" href="css/stage.css">
+
+   after css/shell.css and before campaign/main.css. Leave the line out and
+   exactly the same markup is an ordinary scrolling page: nothing in
+   css/shell.css or js/shell.js assumes this file was loaded.
+
+   WHAT IT COSTS. Everything has to fit. There is no scrollbar to catch
+   overflow, so a campaign whose content cannot compress -- long copy, a tall
+   form, a list that grows -- wants the scrolling page instead. #tw-main clips
+   what it cannot fit and says nothing about it.
+
+   THIS IS THE ONLY STYLESHEET IN THE REPO ALLOWED TO POSITION THE PAGE.
+   `html, body { position: fixed }` and viewport-height units (vh/svh/dvh)
+   belong here and nowhere else, because being the layout is this file's whole
+   job. No other stylesheet -- not css/shell.css, not css/reset.css, not a
+   campaign's chrome -- may use either: two files with an opinion about the
+   page box is how a shell stops being reusable, and css/shell.css is
+   deliberately free of cqh, cqw and vh for the same reason.
+
+   The canvas sizing that used to live beside this (tw-penalty js/stage.js
+   lines 25-39: a devicePixelRatio-capped backing store plus setTransform) is
+   deliberately NOT here and not in the shell's JS. A drawing buffer cannot be
+   set from CSS and the canvas belongs to the mechanic, so that code lives in
+   campaign/main.js next to the canvas it sizes. There is no js/stage.js in
+   this repo; do not go looking for one. */
+
+
+/* ══ the page ═════════════════════════════════════════════════
+   `position: fixed; inset: 0` rather than a height in viewport units. On iOS
+   100vh is the tallest the viewport ever gets -- URL bar retracted -- so a
+   vh-sized page is taller than the window holding it and scrolls by exactly
+   the height of the browser chrome. svh and dvh fix the number and then
+   reflow the entire layout every time that bar slides. Pinning the page to
+   the viewport is the one form that is neither wrong nor animated, which is
+   why this file ends up needing almost none of the units it is licensed for.
+
+   That same pin is what stops the iOS rubber-band: overscroll-behavior below
+   handles the engines that honour it, and there is nothing scrollable left on
+   the ones that do not.
+
+   The soft keyboard: with no scrollable box anywhere, the layout viewport
+   cannot be pushed up and abandoned there -- which is the failure that
+   actually gets reported. iOS additionally pans the VISUAL viewport to reveal
+   a focused field; that is the OS moving a camera over a page that has not
+   moved, it restores itself on blur, and CSS neither can nor should fight it.
+
+   env(safe-area-inset-*) reads 0 unless the campaign's index.html carries
+   `<meta name="viewport" content="width=device-width, initial-scale=1,
+   viewport-fit=cover">`. Without viewport-fit=cover the browser letterboxes
+   the page away from the notch on its own and these four values are zero;
+   with it the page owns the whole screen and this padding is what keeps the
+   header out from under the notch and the footer off the home indicator. */
+
+html {
+  /* Behind the stage, and visible only in the safe-area strips, because the
+     body's background stops at its content box. */
+  background: var(--surface-sunken);
+}
+
+html, body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding:
+    env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--surface);
+  background-clip: content-box;
+  color: var(--text);
+  font-family: var(--font);
+  /* Removes the double-tap zoom delay from every control on the page at once.
+     Pinch zoom is left alone on purpose: it is an accessibility feature, and
+     the audit tw-penalty never closed asks for it explicitly. */
+  touch-action: manipulation;
+  /* A size container as well as a box, so the landscape rule at the bottom
+     asks about the space the stage actually got rather than about the window
+     -- on a notched phone held sideways those differ by the inset above --
+     and so any cq unit inside is already net of the safe area.
+
+     One wanted side effect: a size container is the containing block for its
+     `position: fixed` descendants, so a campaign overlay pinned with
+     `inset: 0` lands inside the safe area instead of under the notch. A
+     <dialog> in the top layer is unaffected and still covers everything. */
+  container: tw-stage / size;
+}
+
+
+/* ══ the three rows ═══════════════════════════════════════════
+   index.html is three elements deep at the top level -- the header slot,
+   #tw-main, the footer slot -- and js/shell.js injects the two bars into the
+   first and the third. The SLOTS are the flex items, not the bars inside
+   them, which is why the `flex: 0 0 auto` css/shell.css already puts on
+   .tw-hdr and .tw-ftr is not enough on its own. Both bars are px-sized blocks
+   with intrinsic height and nothing here touches that: this file only decides
+   who gets the remainder.
+
+   Anything else a campaign hangs directly off <body> -- an overlay, an
+   effects canvas, a sheet -- becomes a fourth flex item and takes a row of
+   its own. Put it inside #tw-main, or take it out of flow. */
+
+body > [data-tw="header"],
+body > [data-tw="footer"] { flex: 0 0 auto; }
+
+#tw-main {
+  position: relative;
+  flex: 1 1 auto;
+  /* The load-bearing declaration. A flex item's default min-height is `auto`,
+     which is its content, so a mechanic taller than the space left pushes the
+     footer off the bottom of a page that cannot scroll instead of being
+     clipped. This is the single most common way a stage-mode page starts
+     scrolling, and it looks like a bug in the mechanic when it happens. */
+  min-height: 0;
+  overflow: hidden;
+  /* `/ size` so that cqh and cqw INSIDE the mechanic mean "of the space the
+     mechanic got". That is the campaign's unit to use or ignore -- the shell
+     never reads it -- and it is the reason this stays a container rather than
+     a plain box. A container cannot be styled by its own query, so a campaign
+     that needs to reshape #tw-main itself queries tw-stage above instead. */
+  container: tw-main / size;
+}
+
+
+/* ══ short and wide ═══════════════════════════════════════════
+   A phone in landscape is about 390px tall with two bars already in it. The
+   footer is dropped here rather than squeezed: this is the one shape with no
+   vertical room left to give, and a band across the bottom takes the last of
+   what the mechanic has. Everywhere else the footer compresses and stays.
+   Measured on tw-penalty, where the alternative left the goal a few dozen
+   pixels of height.
+
+   Wide AND short, not `orientation: landscape`: a 1920x1200 desktop is
+   landscape too and has room for everything. The pair of conditions is what
+   names the actual problem.
+
+   The condition is written once, here. A campaign that wants to restructure
+   at the same moment queries tw-stage with the same two clauses rather than
+   copying them into a media query that drifts the first time either moves.
+
+   The `body` in front of both selectors is load-bearing. A container query
+   does not raise specificity, and .tw-ftr's `display: flex` is declared in
+   css/shell.css, which may well load after this file: at a flat 0-1-0 the
+   later file simply wins and this rule does nothing at all. tw-penalty
+   shipped precisely that bug for an entire port (css/stage.css:71-82, the
+   tagline padding that silently computed to its portrait value in landscape).
+   Do not tidy these selectors back down to the class alone.
+
+   Both selectors because the slot is what occupies the row: hiding the bar
+   alone leaves a zero-height wrapper, which is harmless but pointless, and
+   hiding the wrapper is what actually removes the row. */
+
+@container tw-stage (min-aspect-ratio: 1 / 1) and (max-height: 640px) {
+  body > [data-tw="footer"],
+  body .tw-ftr { display: none; }
+}

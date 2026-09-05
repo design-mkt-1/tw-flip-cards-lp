@@ -1,0 +1,707 @@
+/* ═══════════════════════════════════════════════════════════════
+   TW-FLIP-CARDS — the mechanic's stylesheet
+
+   Nine cards on a hero artboard: turn three and the registration card opens.
+   Ported onto tw-lp-template, which cost this landing its own shell — the
+   header, the footer, the <dialog>, the whole form and every token it used to
+   declare are css/shell.css, css/form.css and css/tokens.css now. What is left
+   here is the game and the picture it sits on.
+
+   ── The two layout modes, both of them ───────────────────────
+   index.html carries the css/stage.css <link> (mode B), so the page never
+   scrolls and #tw-main is what the two bars leave. Inside it the composition
+   is an artboard (mode C): --u is one pixel of the Figma frame — 375 x 666 on
+   mobile, 1920 x 1080 from 900px up — and every number below is a Figma
+   measurement multiplied by it.
+
+   --u is in CONTAINER units, not viewport units: css/stage.css declares
+   #tw-main as a size container named tw-main, so 100cqh is the stage minus the
+   header and the footer. The original read 100svh, which on this page would
+   now be the artboard plus both bars — a page taller than the screen, on a
+   page that cannot scroll. The desktop breakpoint is a container query for the
+   same reason.
+
+   --cu is one pixel of the CARD's own art (authored at 272 x 381), so the deck
+   scales as one drawing. Never shrink a card with transform: scale(): the flip
+   needs rotateY on that element and a scale on a preserve-3d ancestor
+   flattens the perspective.
+
+   ── Colour ───────────────────────────────────────────────────
+   The brand colours are gone from this file: --accent-on-light carries the
+   claim button, --text the headline, --shadow-cta its shadow. This landing's
+   own #ff4500 and #d93900 were two of the four oranges the template exists to
+   settle, and they are not written here any more.
+
+   What remains below is the deck's own light: the gold of a winning ring, the
+   shine band, the fallback colour under each card's art. None of it is a brand
+   colour and none of it appears anywhere but on these nine cards. It is
+   written ONCE, here, and every rule asks for the variable — tools/tokens.py
+   scans css/*.css only, so this block is discipline rather than enforcement.
+   ═══════════════════════════════════════════════════════════════ */
+
+.cmp-root {
+  /* the winner's ring, the pips and the focus outline */
+  --cmp-gold:        #ffd900;
+  --cmp-gold-40:     rgb(255 217 0 / 0.40);
+  --cmp-gold-50:     rgb(255 217 0 / 0.50);
+  --cmp-gold-55:     rgb(255 217 0 / 0.55);
+  --cmp-gold-60:     rgb(255 217 0 / 0.60);
+  --cmp-gold-65:     rgb(255 217 0 / 0.65);
+
+  /* the orange wash that hands off to the stroke baked into winning_card.webp.
+     Written out rather than colour-mixed from --accent: these are the exact
+     values the art was drawn against. */
+  --cmp-accent-0:    rgb(255 69 0 / 0);
+  --cmp-accent-20:   rgb(255 69 0 / 0.20);
+  --cmp-accent-25:   rgb(255 69 0 / 0.25);
+  --cmp-accent-28:   rgb(255 69 0 / 0.28);
+  --cmp-accent-38:   rgb(255 69 0 / 0.38);
+
+  /* the shine band, the pips at rest, and the static affordance a face-down
+     card keeps when reduced motion takes its hover lift away */
+  --cmp-white-0:     rgb(255 255 255 / 0);
+  --cmp-white-22:    rgb(255 255 255 / 0.22);
+  --cmp-white-30:    rgb(255 255 255 / 0.30);
+  --cmp-white-35:    rgb(255 255 255 / 0.35);
+  --cmp-shine-core:  rgb(255 244 194 / 0.5);
+
+  /* under each face until its art arrives, and the logo plate's shadow */
+  --cmp-card-back:   #0b1f6b;
+  --cmp-card-front:  #0038b8;
+  --cmp-plate-shade: rgb(0 0 0 / 0.25);
+
+  /* Motion. The reduced-motion block at the bottom rewrites the first two.
+     --cmp-flip-ease is easeInOutSine and stays local: a card turning through
+     180 degrees needs a symmetric curve, which --ease-out is not. Everything
+     else asks for --ease-out, the template's one curve. */
+  --cmp-flip-ms:    520ms;
+  --cmp-flip-ease:  cubic-bezier(0.37, 0, 0.63, 1);
+  --cmp-hover-ms:   180ms;
+  --cmp-settle-ms:  280ms;
+  --cmp-recede-ms:  360ms;
+
+  /* Figma's "Auto" leading for Roboto: (ascender 1900 + descender 500) / 2048.
+     CSS `normal` is NOT the same number -- Chrome adds the line gap and lands
+     on 1.1975, which is 2px of drift per line at these display sizes. */
+  --cmp-auto-lh: 1.171875;
+}
+
+/* The artboard fills the stage and is centred in it. Absolute rather than a
+   flex child so nothing the shell does to #tw-main can stretch it. */
+.cmp-root {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+
+/* ==========================================================================
+   4. SCALE
+
+   Two lengths carry the whole comp.
+
+     --u   one pixel of the artboard        (1920 x 1080 desktop, 375 x 666 mobile)
+     --cu  one pixel of the card's own art  (the card is authored at 272 x 381)
+
+   Every measurement below is a number copied straight out of Figma multiplied
+   by one of them, so no value is ever written twice for two breakpoints.
+
+   Why --cu exists: the card is drawn at 272 x 381 in Figma but placed at
+   176.435 x 246.908 on desktop and 83.235 x 116.482 on mobile. Those are the
+   same drawing at 0.648659 and 0.306012. The gaps confirm it: divide either
+   breakpoint's gap by its scale and you get 56.035 and 58.373 both times.
+
+   Do NOT shrink the card with transform: scale(). The flip needs rotateY on
+   that same element, and a scale on a preserve-3d ancestor flattens the
+   perspective. Scaling by length leaves transform free.
+   ========================================================================== */
+
+.cmp-root {
+  --u:  min(calc(100cqw / 375), calc(100cqh / 666));
+  --cu: calc(0.306012 * var(--u));
+  --artboard-w: 375;
+  --artboard-h: 666;
+}
+
+@container tw-main (min-width: 900px) {
+  .cmp-root {
+    --u:  min(calc(100cqw / 1920), calc(100cqh / 1080));
+    --cu: calc(0.648659 * var(--u));
+    --artboard-w: 1920;
+    --artboard-h: 1080;
+  }
+}
+
+
+/* ==========================================================================
+   5. LAYOUT
+   ========================================================================== */
+
+.cmp-hero {
+  position: relative;
+  width: 100%;
+  height: calc(var(--artboard-h) * var(--u));
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The artwork always covers the full width, however wide the window is. */
+.cmp-hero__bg,
+.cmp-hero__bg img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cmp-hero__bg img {
+  object-fit: cover;
+  object-position: center;
+}
+
+/* The content sits on a centred artboard so it keeps the composition of the
+   Figma frame no matter how wide the window gets. */
+.cmp-stage {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: calc(var(--artboard-w) * var(--u));
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+.cmp-copy,
+.cmp-game { position: absolute; }
+
+/* Mobile: stacked, from the 375 x 666 frame */
+.cmp-copy { left: calc(17 * var(--u));  top: calc(17 * var(--u));  width: calc(340 * var(--u)); }
+.cmp-game { left: calc(45 * var(--u));  top: calc(184 * var(--u)); width: calc(284 * var(--u)); }
+
+@container tw-main (min-width: 900px) {
+  /* Desktop: copy left, cards right, from the 1920 x 1080 frame */
+  .cmp-copy { left: calc(152 * var(--u));  top: calc(347 * var(--u));  width: calc(875.188 * var(--u)); }
+  .cmp-game { left: calc(1173 * var(--u)); top: calc(124 * var(--u));  width: calc(602 * var(--u)); }
+}
+
+
+/* ==========================================================================
+   6. BRAND
+   ========================================================================== */
+
+.cmp-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(24 * var(--u));
+}
+
+@container tw-main (min-width: 900px) {
+  .cmp-copy { gap: calc(64 * var(--u)); }
+}
+
+.cmp-plate {
+  display: flex;
+  background: var(--text);
+  border-radius: calc(5.254 * var(--u));
+  padding: calc(4.378 * var(--u)) calc(10.508 * var(--u));
+  box-shadow: 0 calc(1.751 * var(--u)) calc(0.876 * var(--u)) var(--cmp-plate-shade);
+}
+
+.cmp-plate img {
+  width: calc(121.984 * var(--u));
+  height: calc(21.891 * var(--u));
+}
+
+@container tw-main (min-width: 900px) {
+  .cmp-plate {
+    border-radius: calc(10.971 * var(--u));
+    padding: calc(9.143 * var(--u)) calc(21.943 * var(--u));
+    box-shadow: 0 calc(3.657 * var(--u)) calc(1.829 * var(--u)) var(--cmp-plate-shade);
+  }
+  .cmp-plate img { width: calc(254.733 * var(--u)); height: calc(45.714 * var(--u)); }
+}
+
+.cmp-headline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6.216 * var(--u));
+  width: 100%;
+  font-family: var(--font);
+  font-weight: 900;
+  font-style: italic;
+  font-stretch: 75%;          /* the condensed cut */
+  text-transform: uppercase;
+  text-align: center;
+  /* Figma sets both lines to Auto leading (nodes 12:337 / 12:338). */
+  line-height: var(--cmp-auto-lh);
+  font-synthesis: none;
+}
+
+.cmp-headline__a { font-size: calc(30 * var(--u)); color: var(--text); }
+.cmp-headline__b { font-size: calc(38 * var(--u)); color: var(--cmp-gold); }
+
+@container tw-main (min-width: 900px) {
+  .cmp-headline { gap: calc(16 * var(--u)); }
+  .cmp-headline__a { font-size: calc(80 * var(--u)); }
+  .cmp-headline__b { font-size: calc(100 * var(--u)); white-space: nowrap; }
+}
+
+
+/* ==========================================================================
+   7. GRID
+   Widths and gaps are in card units, so one set of numbers serves both
+   breakpoints. 3 x 272 + 2 x 56.035 = 928.07, which is exactly the 602px
+   desktop frame and the 284px mobile frame once scaled.
+   ========================================================================== */
+
+.cmp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, calc(272 * var(--cu)));
+  grid-template-rows: repeat(3, calc(381 * var(--cu)));
+  column-gap: calc(56.035 * var(--cu));
+  row-gap: calc(58.373 * var(--cu));
+  justify-content: center;
+}
+
+.cmp-cell {
+  position: relative;
+  width: calc(272 * var(--cu));
+  height: calc(381 * var(--cu));
+}
+
+/* ==========================================================================
+   8. CARD
+
+   Three levels, and they never share a job:
+     .cmp-cell   layout box, never moves
+     .cmp-card   perspective host, hit target, focus ring, all 2D transforms
+     .cmp-flip   preserve-3d, and its transform is rotateY and nothing else
+   ========================================================================== */
+
+.cmp-card {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(44 * var(--cu));
+  /* Perspective in card units, so the same depth reads at both sizes. A fixed
+     1000px would give 24% near/far on desktop and 5% on the 83px mobile card,
+     which is two different interactions rather than one. */
+  perspective: calc(900 * var(--cu));
+  transition: transform var(--cmp-hover-ms) var(--ease-out);
+}
+
+.cmp-flip {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--cmp-flip-ms) var(--cmp-flip-ease);
+}
+
+.cmp-cell[data-face="front"] .cmp-flip { transform: rotateY(180deg); }
+
+.cmp-face {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(44 * var(--cu));
+  overflow: hidden;           /* on the FACE. Never on .cmp-flip: overflow forces
+                                 transform-style back to flat and the rotation
+                                 collapses into a horizontal squash. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* The half-unit of separation stops the two coplanar faces z-fighting near
+   90 degrees, and gives older WebKit the composited layer it needs before it
+   will honour backface-visibility at all. */
+.cmp-face--back  { transform: translateZ(calc(0.5 * var(--cu))); }
+.cmp-face--front { transform: rotateY(180deg) translateZ(calc(0.5 * var(--cu))); }
+
+/* --- faces ----------------------------------------------------------------
+
+   All three faces are finished art, exported by tools/optimize.py at exactly
+   twice the 272 x 381 card, shadow cropped off, alpha kept. 100% 100% is
+   therefore distortion-free at every breakpoint, and the art's 88px corner
+   radius is the same 44 card units this element clips to. Each face's border
+   is baked into the art — nothing here draws an outline any more. */
+
+.cmp-face--back {
+  background-color: var(--cmp-card-back);
+  background-image: url("assets/closed_card.webp");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.cmp-face--front {
+  /* Under the art until it arrives: the mid blue of the face gradient. */
+  background-color: var(--cmp-card-front);
+  background-image: url("assets/simple_card.webp");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+/* The top-prize cards reveal the orange-outlined face. data-win-face is set at
+   build time, NOT at flip time like data-win: matching here from the start
+   makes the browser fetch this image on load instead of mid-flip.
+
+   Under CONFIG.alwaysWin it no longer mirrors data-prize at build time: three
+   cards carry it so both face images are fetched with the page, and then it
+   MOVES — promote() puts it on each card the visitor turns, revealRest() takes
+   it off the ones they did not. It has to move. Left alone, a 50.000 card
+   would open drawing the top prize's orange frame. */
+.cmp-cell[data-win-face] .cmp-face--front {
+  background-image: url("assets/winning_card.webp");
+}
+
+/* Three lines, 222 x 135 at y=122.5 in the 380-tall card (Figma 12:293), the
+   geometry the hryvnia redraw brought with it.
+
+   Upright, as the redesign draws it (Roboto Black, not Black Italic) and as
+   Figma 12:293 renders it. This is the ONLY place in the display family that
+   is not italic — the headline, the offer block and the confirmation title all
+   stay slanted. It needs the tight upright subset declared in section 2; until
+   2026-09-04 no upright face shipped at all, so asking for normal here would
+   have changed nothing on screen and the deviation was recorded instead. */
+.cmp-prize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(122.5 * var(--cu));
+  height: calc(135 * var(--cu));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(18 * var(--cu));
+  font-family: var(--font);
+  font-weight: 900;
+  font-style: normal;
+  font-stretch: 100%;         /* the prize numbers are NOT condensed */
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--text);
+  white-space: nowrap;
+  font-synthesis: none;
+}
+
+/* Line boxes are the cap heights Figma trims to (34 / 31 / 34), not the type
+   size — the glyphs overhang on purpose, so never clip this element. */
+.cmp-prize__pct  { font-size: calc(48 * var(--cu)); line-height: calc(34 * var(--cu)); }
+.cmp-prize__plus { font-size: calc(44 * var(--cu)); line-height: calc(31 * var(--cu)); }
+.cmp-prize__fs   { font-size: calc(48 * var(--cu)); line-height: calc(34 * var(--cu)); }
+
+/* --- states -------------------------------------------------------------- */
+
+@media (hover: hover) and (pointer: fine) {
+  .cmp-cell[data-face="back"] .cmp-card:hover {
+    transform: translateY(calc(-9 * var(--cu)));
+  }
+}
+
+.cmp-card:active { transform: scale(0.975); transition-duration: 100ms; }
+
+.cmp-card:focus-visible {
+  outline: max(2px, calc(3 * var(--cu))) solid var(--cmp-gold);
+  outline-offset: max(2px, calc(4 * var(--cu)));
+}
+
+.cmp-cell[data-face="front"] .cmp-card { cursor: default; }
+
+/* The winner ring. It marks, it does not celebrate: while the visitor is still
+   hunting, the marker is static so they can count to three. It waits for the
+   flip to land (--fc-flip-ms) — fading in mid-rotation drew a full-size frame
+   around a card that was still an edge-on sliver.
+   Three shadows, outermost first: a hairline of gold, a tight gold core, and
+   a wider orange wash that hands off to the orange stroke baked into
+   winning_card.webp instead of fighting it. Layer count matches the reveal
+   state below so the box-shadow interpolates list-to-list. */
+.cmp-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 max(1px, calc(2 * var(--cu))) var(--cmp-gold),
+              0 0 calc(14 * var(--cu)) calc(2 * var(--cu)) var(--cmp-gold-50),
+              0 0 calc(34 * var(--cu)) calc(8 * var(--cu)) var(--cmp-accent-25);
+  opacity: 0;
+  transition: opacity var(--cmp-settle-ms) var(--ease-out) var(--cmp-flip-ms),
+              box-shadow var(--cmp-settle-ms) var(--ease-out) var(--cmp-flip-ms);
+}
+
+.cmp-cell[data-win][data-face="front"] .cmp-card::after { opacity: 1; }
+
+.cmp-cell[data-win][data-face="front"] .cmp-card {
+  animation: fc-settle var(--cmp-settle-ms) var(--ease-out)
+             calc(var(--cmp-flip-ms) - 60ms) both;
+}
+
+@keyframes fc-settle {
+  0%   { transform: scale(1); }
+  42%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* The win moment: the three winners brighten left to right, the other six
+   step back. Opacity and transform only — animating a blur on six elements at
+   the busiest moment on the page is the one thing guaranteed to stutter. */
+.cmp-grid[data-phase="reveal"] [data-win] .cmp-card::after {
+  box-shadow: 0 0 0 max(1px, calc(2 * var(--cu))) var(--cmp-gold),
+              0 0 calc(20 * var(--cu)) calc(4 * var(--cu)) var(--cmp-gold-65),
+              0 0 calc(48 * var(--cu)) calc(12 * var(--cu)) var(--cmp-accent-38);
+  transition-delay: calc(var(--i) * 80ms);
+}
+
+/* --- landing flourish -----------------------------------------------------
+
+   Two one-shot layers, both delayed to the flip landing, both gone within a
+   second. Neither loops during the hunt.
+
+   The bloom lives on .cmp-card::before at z-index:-1. .cmp-card is
+   position:relative + z-index:1, so it is a stacking context of its own: the
+   negative-z pseudo paints behind .cmp-flip but still inside the card, above
+   the hero background. inset -48cu keeps it inside the 56.035/58.373cu grid
+   gaps, so it never reaches a neighbouring cell. pointer-events:none matters:
+   a pseudo box is hit-tested as part of its originating button, so without it
+   the card's hit area would grow into the gap. */
+.cmp-card::before {
+  content: "";
+  position: absolute;
+  inset: calc(-48 * var(--cu));
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+      var(--cmp-gold-55),
+      var(--cmp-accent-28) 55%,
+      var(--cmp-accent-0) 100%);
+  opacity: 0;
+}
+
+.cmp-cell[data-win][data-face="front"] .cmp-card::before {
+  animation: fc-bloom 900ms var(--ease-out) var(--cmp-flip-ms) both;
+}
+
+@keyframes fc-bloom {
+  0%   { opacity: 0; }
+  28%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The shine band lives INSIDE the front face, so the face's own
+   overflow:hidden + 44cu radius clip it, and as the later-in-tree positioned
+   sibling of .cmp-prize it paints over the prize text — a specular pass, not
+   an underlay.
+   The face's own rotateY(180deg) does NOT mirror this: once .cmp-flip has also
+   turned 180deg the two cancel to identity, which is exactly why the prize
+   text reads the right way round in the landed state. So local X is screen X
+   — the band starts off the left edge (-150cu, its own 110cu width clear of
+   zero) and translates positive to sweep left-to-right. Do not "fix" the sign
+   by reasoning from the face's transform alone.
+   Base opacity is 0, so nothing of it can show mid-flip even though
+   backface-visibility does not inherit to children. Transform and opacity
+   only. */
+.cmp-face--front::after {
+  content: "";
+  position: absolute;
+  top: calc(-60 * var(--cu));
+  bottom: calc(-60 * var(--cu));
+  left: calc(-150 * var(--cu));
+  width: calc(110 * var(--cu));
+  pointer-events: none;
+  background: linear-gradient(to right,
+      var(--cmp-white-0) 0%,
+      var(--cmp-white-30) 42%,
+      var(--cmp-shine-core) 50%,
+      var(--cmp-white-30) 58%,
+      var(--cmp-white-0) 100%);
+  transform: skewX(-20deg) translateX(0);
+  opacity: 0;
+}
+
+.cmp-cell[data-win][data-face="front"] .cmp-face--front::after {
+  animation: fc-shine 640ms var(--ease-out) calc(var(--cmp-flip-ms) + 60ms) both;
+}
+
+@keyframes fc-shine {
+  0%   { opacity: 0; transform: skewX(-20deg) translateX(0); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: skewX(-20deg) translateX(calc(460 * var(--cu))); }
+}
+
+/* --- reveal breathe -------------------------------------------------------
+
+   The static-marker rule above holds while the visitor is still counting.
+   Once data-phase="reveal" exists all three are found and the board is
+   locked — there is nothing left to count, so a slow breathe no longer
+   competes with the game; it holds the celebratory state behind the claim
+   button after the modal is dismissed. Dedicated gradient layer on
+   .cmp-cell::after (behind the card: the card's z-index:1 beats z-index:0),
+   and the loop animates opacity ONLY — the hairline never moves. Negative
+   delays phase-offset the three winners by --i so they breathe as a round. */
+.cmp-cell[data-win]::after {
+  content: "";
+  position: absolute;
+  inset: calc(-40 * var(--cu));
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+      var(--cmp-gold-40),
+      var(--cmp-accent-20) 60%,
+      var(--cmp-accent-0) 100%);
+  opacity: 0;
+}
+
+.cmp-grid[data-phase="reveal"] .cmp-cell[data-win]::after {
+  animation: fc-breathe 2800ms ease-in-out calc(var(--i) * -933ms) infinite;
+}
+
+@keyframes fc-breathe {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.6; }
+}
+
+.cmp-grid[data-phase="reveal"] .cmp-cell:not([data-win]) {
+  opacity: 0.35;
+  transform: scale(0.97);
+}
+
+.cmp-grid .cmp-cell {
+  transition: opacity var(--cmp-recede-ms) var(--ease-out),
+              transform var(--cmp-recede-ms) var(--ease-out);
+}
+
+/* Progress pips */
+.cmp-progress {
+  display: flex;
+  justify-content: center;
+  gap: calc(10 * var(--u));
+  margin-top: calc(14 * var(--u));
+}
+
+.cmp-pip {
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
+  border-radius: 50%;
+  background: var(--cmp-white-22);
+  box-shadow: inset 0 0 0 1px var(--cmp-white-30);
+  transform: scale(0.6);
+  opacity: 0.55;
+  transition: transform 200ms var(--ease-out),
+              opacity 200ms var(--ease-out),
+              background 200ms var(--ease-out);
+}
+
+.cmp-pip[data-on] {
+  background: var(--cmp-gold);
+  box-shadow: 0 0 calc(10 * var(--u)) var(--cmp-gold-60);
+  transform: scale(1);
+  opacity: 1;
+}
+
+
+
+/* The standing claim button under the grid. It exists so that dismissing the
+   modal does not lose the offer — a promo page that throws away the CTA on
+   Escape is a conversion bug. */
+.cmp-claim {
+  display: none;
+  margin: calc(18 * var(--u)) auto 0;
+  padding: calc(11 * var(--u)) calc(22 * var(--u));
+  background: var(--accent-on-light);   /* white on it: see the token */
+  border-radius: calc(10 * var(--u));
+  box-shadow: var(--shadow-cta);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: calc(14 * var(--u));
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: filter 140ms ease, transform 120ms var(--ease-out);
+}
+
+.cmp-claim[data-on] { display: block; }
+.cmp-claim:hover { filter: brightness(1.07); }
+.cmp-claim:active { transform: scale(0.985); }
+.cmp-claim:focus-visible { outline: 2px solid var(--cmp-gold); outline-offset: 3px; }
+
+
+/* ==========================================================================
+   12. REDUCED MOTION
+   Not a kill switch. Each animation degrades to its gentlest meaningful form.
+   An instant face swap would lose the link between the click and the result,
+   so the flip becomes a crossfade instead of disappearing.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .cmp-root {
+    --cmp-flip-ms:   220ms;
+    --cmp-hover-ms:  120ms;
+              }
+
+  .cmp-flip { transform: none !important; transform-style: flat; }
+
+  .cmp-face {
+    backface-visibility: visible;
+    -webkit-backface-visibility: visible;
+    transition: opacity var(--cmp-flip-ms) ease;
+  }
+
+  /* Without this the front face keeps its rotateY(180deg) and every prize
+     renders as mirrored text. */
+  .cmp-face--front { transform: none !important; opacity: 0; }
+  .cmp-face--back  { transform: none !important; opacity: 1; }
+
+  .cmp-cell[data-face="front"] .cmp-face--front { opacity: 1; }
+  .cmp-cell[data-face="front"] .cmp-face--back  { opacity: 0; }
+
+  .cmp-cell[data-win][data-face="front"] .cmp-card { animation: none; }
+
+  .cmp-grid[data-phase="reveal"] [data-win] .cmp-card::after { transition-delay: 0ms; }
+  .cmp-grid[data-phase="reveal"] .cmp-cell:not([data-win]) { transform: none; }
+
+  /* The ring gate needs no special case: its delay is --fc-flip-ms, which
+     this block already shortens to 220ms — it waits for the crossfade
+     exactly as it waits for the rotation. The flourishes go entirely, and
+     the breathe degrades to its own mid-point held still: the halo is the
+     information, the motion was only emphasis. */
+  .cmp-cell[data-win][data-face="front"] .cmp-card::before,
+  .cmp-cell[data-win][data-face="front"] .cmp-face--front::after { animation: none; }
+
+  .cmp-grid[data-phase="reveal"] .cmp-cell[data-win]::after {
+    animation: none;
+    opacity: 0.45;
+    transition: opacity var(--cmp-recede-ms) var(--ease-out);
+  }
+
+  /* Face-down cards need a static affordance once the lift is gone. */
+  .cmp-cell[data-face="back"] .cmp-face--back {
+    box-shadow: inset 0 0 0 1px var(--cmp-white-35);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .cmp-cell[data-face="back"] .cmp-card:hover { transform: none; }
+  }
+
+  /* The press stays. It is four pixels, caused by the user's own finger, and
+     removing it makes the page feel broken. */
+
+  .cmp-pip { transform: none; }
+}
+
+
+@media (prefers-contrast: more) {
+  .cmp-grid[data-phase="reveal"] .cmp-cell:not([data-win]) { opacity: 0.6; }
+  /* One solid ring, no glow: soft gradients against the light hero art are
+     exactly what this preference asks to avoid. The reveal-phase selector is
+     repeated because it out-specifies a bare .cmp-card::after override. */
+  .cmp-card::after,
+  .cmp-grid[data-phase="reveal"] [data-win] .cmp-card::after {
+    box-shadow: 0 0 0 max(2px, calc(4 * var(--cu))) var(--cmp-gold);
+  }
+  .cmp-cell[data-win][data-face="front"] .cmp-card::before,
+  .cmp-cell[data-win][data-face="front"] .cmp-face--front::after,
+  .cmp-grid[data-phase="reveal"] .cmp-cell[data-win]::after { animation: none; }
+}
