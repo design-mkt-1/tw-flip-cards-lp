@@ -14,6 +14,11 @@ venv/
 
 _site/
 
+# tools/handoff.py writes the IT archive here. It is a build output of
+# committed files: reproducible in one command, and 400 kB of zip nobody
+# should be diffing.
+dist/
+
 .DS_Store
 Thumbs.db
 *.log
