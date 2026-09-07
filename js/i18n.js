@@ -164,7 +164,37 @@
      ?lang=ru without the template needing a second HTML file. It is not
      persisted: a link that forces a language should not overwrite what the
      visitor chose on a previous visit. */
+  /* ── one language per file ────────────────────────────────────
+     A campaign that serves a separate HTML file per language sets
+     `languageUrls` in campaign.js: { ua: './index.html', ru: './ru.html' }.
+     The menu then navigates instead of re-rendering, and the file decides
+     the language rather than the visitor's browser or a stale saved choice.
+
+     Without that map nothing changes: one HTML file, the table swaps in
+     place, and the choice persists. */
+  function urlFor(code) {
+    var map = C.languageUrls || {};
+    return map[code] || '';
+  }
+
+  function byFile() {
+    return Object.keys(C.languageUrls || {}).length > 0;
+  }
+
   function detect() {
+    /* In file mode the page IS the language, and nothing may override it.
+       ?lang=en on ru.html would otherwise leave the card speaking English
+       inside a Russian page — the failure that made tw-flip-cards-lp pin
+       `languages` to a single entry before this existed. */
+    if (byFile()) {
+      var tag = (document.documentElement.lang || '').toLowerCase();
+      for (var j = 0; j < LANGS.length; j++) {
+        var m = (window.TW_LOCALES || {})[LANGS[j]];
+        if (m && m.tag === tag) return LANGS[j];
+      }
+      return FALLBACK;
+    }
+
     var forced = new URLSearchParams(location.search).get('lang');
     if (forced && LANGS.indexOf(forced) >= 0) return forced;
 
@@ -266,7 +296,10 @@
   }
 
   function choose(option) {
-    set(option.getAttribute('data-lang'));
+    var code = option.getAttribute('data-lang');
+    var href = urlFor(code);
+    if (href) { location.assign(href); return; }   // one language per file
+    set(code);
     closeMenu();
   }
 

@@ -233,7 +233,6 @@ body {
      credential keys are all small text. One step darker on the same grey:
      5.19 on white, 4.70 on the field. Indistinguishable at 13px. */
   --fc-muted:       #656d7e;
-  --fc-footer-txt:  #9ca3af;
   --fc-border:      #e7e6e9;
   --fc-field-bg:    #f3f4f5;
   --fc-badge-bg:    rgb(25 25 112 / 0.2);
@@ -381,27 +380,9 @@ body {
   .fc-copy { gap: calc(64 * var(--u)); }
 }
 
-.fc-plate {
-  display: flex;
-  background: #fff;
-  border-radius: calc(5.254 * var(--u));
-  padding: calc(4.378 * var(--u)) calc(10.508 * var(--u));
-  box-shadow: 0 calc(1.751 * var(--u)) calc(0.876 * var(--u)) rgb(0 0 0 / 0.25);
-}
-
-.fc-plate img {
-  width: calc(121.984 * var(--u));
-  height: calc(21.891 * var(--u));
-}
-
-@media (min-width: 900px) {
-  .fc-plate {
-    border-radius: calc(10.971 * var(--u));
-    padding: calc(9.143 * var(--u)) calc(21.943 * var(--u));
-    box-shadow: 0 calc(3.657 * var(--u)) calc(1.829 * var(--u)) rgb(0 0 0 / 0.25);
-  }
-  .fc-plate img { width: calc(254.733 * var(--u)); height: calc(45.714 * var(--u)); }
-}
+/* The hero's logo plate is gone: js/shell.js draws the wordmark in the shared
+   bar above, and on a phone the two sat 60px apart saying the same thing. The
+   Figma hero has the plate because the page it was drawn for had no header. */
 
 .fc-headline {
   display: flex;
@@ -785,121 +766,14 @@ body {
 
 
 /* ==========================================================================
-   9. FOOTER
-   Real pixels, not artboard units: this is reading text, and it must respond
-   to the browser's own zoom and font-size settings.
+   9. THE FOOTER IS THE SHELL'S
+
+   214px on a phone here, 153 at tw-penalty, 147 in the template: three Top
+   Win landings drew the same four payment badges and the same copyright
+   line three times, at three heights. css/shell.css draws it now, and
+   js/shell.js builds it from campaign.js § brand.payments into the
+   <div data-tw="footer"> marker.
    ========================================================================== */
-
-.fc-footer {
-  background: var(--fc-navy-deep);
-  color: var(--fc-footer-txt);
-  font-family: var(--fc-ui);
-  padding: 40px 24px 32px;
-}
-
-.fc-footer__in {
-  max-width: 1680px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-.fc-fgroup {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.fc-flabel {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
-}
-
-.fc-frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
-
-.fc-pay {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  /* 9 + 1px border = the 10 Figma insets its 74x24 logo by, so the badge comes
-     out at exactly 94 x 36 instead of 96 x 36. */
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: var(--fc-badge-bg);
-  border: 1px solid var(--fc-badge-brd);
-}
-
-.fc-pay img { height: 24px; width: auto; }
-
-.fc-divider { height: 1px; background: rgb(156 163 175 / 0.16); }
-
-.fc-footer__bottom {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  /* Figma's divider is a zero-height line; ours is a real pixel, so pull the
-     row back over it and the mobile footer lands on 214 rather than 215. */
-  margin-top: -1px;
-  font-size: 12px;
-}
-
-/* Figma's mobile footer (19:2784) is payments, rule, copyright — no logo. */
-.fc-footer__logo {
-  display: none;
-  width: 110px;
-  height: 24px;
-  padding: 3.429px 8.229px;
-  background: #fff;
-  border-radius: 4.114px;
-  box-shadow: 0 1.371px 0.686px rgb(0 0 0 / 0.25);
-}
-
-/* max-width: none, or the scoped reset's max-width:100% clamps the logo to
-   the 93.5px inside the plate's padding. Figma lets it overhang. */
-.fc-footer__logo img { flex: none; max-width: none; width: 95.525px; height: 17.143px; }
-
-/* The desktop footer (19:2691) is a single row: the logo plate hard left, the
-   copyright pushed to the far side of that same group, then the payments
-   column. The DOM stays in the mobile order — payments, rule, copyright —
-   because that is the order in which the rule actually separates something,
-   and `order` is safe here: since the social links went, the footer holds no
-   focusable element at all, so there is no tab sequence to disturb.
-
-   The payments column is 476 wide in Figma with its content flush left inside
-   it, which is what puts it 199px shy of the right edge. `flex: 0 1 476px`
-   reproduces that at 1920 and lets it collapse onto its content before the
-   copyright row starts losing room. */
-@media (min-width: 900px) {
-  /* 120 / 1920 = 6.25vw, so the artboard is reproduced exactly at 1920 and
-     the gutter eases in below it. A flat 120 leaves only 660px of content at
-     the 900 breakpoint, which is not enough for the row. */
-  .fc-footer { padding: 48px clamp(40px, 6.25vw, 120px) 40px; }
-  .fc-footer__in { flex-direction: row; align-items: flex-start; gap: 40px; }
-  /* Holds 476 while there is room and gives way down to its own content
-     before the copyright starts wrapping. */
-  .fc-fgroup { flex: 0 1 476px; min-width: max-content; align-items: flex-start; gap: 16px; }
-  .fc-footer__bottom p { white-space: nowrap; }
-  .fc-flabel { font-size: 14px; }
-  .fc-divider { display: none; }
-  .fc-footer__bottom {
-    order: -1;
-    flex: 1 1 auto;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    gap: 24px;
-    margin-top: 0;
-    font-size: 14px;
-  }
-  .fc-footer__logo { display: flex; }
-}
-
 
 /* ==========================================================================
    10. THE CLAIM BUTTON
@@ -1037,8 +911,6 @@ body {
   .fc-cell[data-win][data-face="front"] .fc-card::before,
   .fc-cell[data-win][data-face="front"] .fc-face--front::after,
   .fc-grid[data-phase="reveal"] .fc-cell[data-win]::after { animation: none; }
-  /* #d5d9e0 is the light-on-navy value, and the footer is the only surface
-     of this landing it applies to now — the card's own contrast rules are in
-     css/form.css with the rest of it. */
-  .fc-footer { color: #d5d9e0; }
+  /* The footer's own forced-colors behaviour travels with it, in
+     css/shell.css. Nothing of this landing's is left to raise here. */
 }

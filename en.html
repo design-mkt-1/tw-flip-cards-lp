@@ -54,6 +54,7 @@
      html, body rule. This one is deployed on its own page. -->
 <link rel="stylesheet" href="css/reset.css">
 <link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/shell.css">
 <link rel="stylesheet" href="css/form.css">
 <link rel="stylesheet" href="css/styles.css">
 <noscript><style>.fc-claim { display: block; }</style></noscript>
@@ -61,6 +62,11 @@
 <body>
 
 <div class="fc-root">
+
+  <!-- js/shell.js replaces these two markers with the header and the footer
+       every Top Win landing shares, built from campaign.js. They sit inside
+       .fc-root so this page's scoped reset reaches them. -->
+  <div data-tw="header"></div>
 
   <main class="fc-hero">
 
@@ -83,9 +89,6 @@
     <div class="fc-stage">
 
       <div class="fc-copy">
-        <div class="fc-plate">
-          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="255" height="46">
-        </div>
         <h1 class="fc-headline">
           <span class="fc-headline__a" data-i18n="hero.1">Flip the cards</span>
           <span class="fc-headline__b" data-i18n="hero.2">claim your bonus!</span>
@@ -111,30 +114,7 @@
     </div>
   </main>
 
-  <footer class="fc-footer">
-    <div class="fc-footer__in">
-
-      <div class="fc-fgroup">
-        <p class="fc-flabel" data-i18n="footer.payments">Payment methods</p>
-        <div class="fc-frow">
-          <span class="fc-pay"><img src="assets/img/icons/pay-visa.svg" alt="Visa" width="74" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-mastercard.svg" alt="Mastercard" width="39" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-tether.svg" alt="Tether" width="24" height="24"></span>
-          <span class="fc-pay"><img src="assets/img/icons/pay-bitcoin.svg" alt="Bitcoin" width="24" height="24"></span>
-        </div>
-      </div>
-
-      <div class="fc-divider"></div>
-
-      <div class="fc-footer__bottom">
-        <span class="fc-footer__logo">
-          <img src="assets/img/logo-topwin.svg" alt="TopWin" width="96" height="17">
-        </span>
-        <p data-i18n="footer.rights">© 2026 All rights reserved</p>
-      </div>
-
-    </div>
-  </footer>
+  <div data-tw="footer"></div>
 
 
 </div>

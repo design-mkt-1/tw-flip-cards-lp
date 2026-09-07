@@ -98,28 +98,42 @@ window.TW_CAMPAIGN = {
     passwordMin:  8
   },
 
-  /* ── Language ─────────────────────────────────────────────────
-     ONE entry, and it is the page's own — this landing serves three HTML
-     files, one per language, each pre-translated, with hreflang between
-     them. js/i18n.js only ever selects a code that appears here, so on
-     ru.html neither a stale localStorage entry nor ?lang=en can leave the
-     card speaking a different language than the page around it.
+  /* ── Languages ────────────────────────────────────────────────
+     All three, in header-menu order. This landing serves one pre-translated
+     HTML file per language with hreflang between them, so the menu is a
+     navigation control: see languageUrls below.
 
      'ua' is the internal code and 'uk' the real language tag; the map is in
-     js/strings.js § TW_LOCALES, and <html lang> gets the tag. */
-  languages: [{ uk: 'ua', ru: 'ru', en: 'en' }[document.documentElement.lang] || 'ua'],
+     js/strings.js § TW_LOCALES, and <html lang> carries the tag. */
+  languages: ['ua', 'ru', 'en'],
+
+  /* One language per file, so the menu navigates instead of re-rendering:
+     <html lang> on the file decides which table is used, and neither ?lang
+     nor a stale localStorage entry can override it. Before tw-lp-template
+     v1.0.6 offered this, `languages` here held a single code read off
+     <html lang> — safe, but it meant no menu at all. */
+  languageUrls: {
+    ua: './index.html',
+    ru: './ru.html',
+    en: './en.html'
+  },
 
   /* ── Brand and chrome ─────────────────────────────────────────
-     header and footer are this landing's own markup, in the three HTML
-     files, so the shell must not draw its own: with show:false js/shell.js
-     mounts the dialog and nothing else. themeColor is left unset for the
-     same reason — the <meta> in the head is already this campaign's. */
+     The bar and the footer are the shared ones now, built by js/shell.js
+     into the two <div data-tw> markers in each HTML file. The landing drew
+     its own footer until 2026-09-07 and had no header at all — three Top Win
+     pages, three footers of three different heights.
+
+     No mute: this mechanic has no audio, and a speaker that toggles nothing
+     is worse than no speaker. themeColor stays unset because the <meta> in
+     each head is already this campaign's. */
   brand: {
-    logo:    'assets/img/logo-topwin.svg',
-    logoAlt: 'TopWin'
+    logo:     'assets/img/logo-topwin.svg',
+    logoAlt:  'TopWin',
+    payments: ['visa', 'mastercard', 'tether', 'bitcoin']
   },
-  header: { show: false },
-  footer: { show: false },
+  header: { show: true, mute: false, lang: true },
+  footer: { show: true },
 
   /* No audio in this mechanic, so no speaker and no pool. */
   sounds: {},
@@ -135,8 +149,10 @@ window.TW_CAMPAIGN = {
                       qualifier under a headline. Here the amount IS the
                       headline, so it is the figure alone.
 
-     The six page keys below are this landing's own copy — the hero, the
-     board's label, the claim button, the footer. They are ALSO written into
+     The four page keys below are this landing's own copy — the hero, the
+     board's label and the claim button. The footer's two lines used to be
+     here too; they are the shell's now (footer.pay / footer.copy in
+     js/strings.js), which is what "the same footer everywhere" means. They are ALSO written into
      the three HTML files as real text, which is what paints before any
      script runs and what a crawler reads; js/i18n.js then renders the same
      words from here. Change one, change both. */
@@ -147,9 +163,7 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни картки',
       'hero.2':          'забери свій бонус!',
       'game.label':      'Переверніть три картки та заберіть вітальний бонус',
-      'cta.claim':       'Забрати бонус',
-      'footer.payments': 'Способи оплати',
-      'footer.rights':   '© 2026 Усі права захищені'
+      'cta.claim':       'Забрати бонус'
     },
     ru: {
       'promo.title':     'Приветственный казино бонус',
@@ -157,9 +171,7 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни карты',
       'hero.2':          'забери свой бонус!',
       'game.label':      'Переверните три карты и заберите приветственный бонус',
-      'cta.claim':       'Забрать бонус',
-      'footer.payments': 'Способы оплаты',
-      'footer.rights':   '© 2026 Все права защищены'
+      'cta.claim':       'Забрать бонус'
     },
     en: {
       'promo.title':     'Welcome casino bonus',
@@ -167,9 +179,7 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Flip the cards',
       'hero.2':          'claim your bonus!',
       'game.label':      'Turn three cards and claim your welcome bonus',
-      'cta.claim':       'Claim bonus',
-      'footer.payments': 'Payment methods',
-      'footer.rights':   '© 2026 All rights reserved'
+      'cta.claim':       'Claim bonus'
     }
   }
 };

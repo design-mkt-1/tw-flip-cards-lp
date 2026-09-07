@@ -112,7 +112,8 @@ def serve(root):
 # offsetParent for the close button: offsetParent is null for a positioned
 # element even when it is perfectly visible, and this button is sticky.
 MEASURE = """() => {
-  const footer = document.querySelector('.fc-footer');
+  /* The footer is tw-lp-template's, built by js/shell.js. */
+  const footer = document.querySelector('.tw-ftr');
   /* The card is tw-lp-template's now: js/shell.js appends it to <body> as
      #tw-signup, and js/form.js owns its close button. The ids changed; what
      is asserted about them did not, and this is the assertion that caught a
@@ -293,7 +294,7 @@ def check(page, url, errors):
                    'below the fold is taking focus at load' % m['scrollY'])
 
     if m['footerBottom'] is None:
-        bad.append('no .fc-footer on the page')
+        bad.append('no .tw-ftr on the page')
     else:
         # A page shorter than the viewport still reports the viewport height.
         allowed = max(m['footerBottom'], m['innerHeight']) + 1
