@@ -61,12 +61,19 @@
 </head>
 <body>
 
+<!-- js/shell.js replaces these two markers with the header and the footer
+     every Top Win landing shares, built from campaign.js.
+
+     OUTSIDE .fc-root, deliberately. This page's reset is scoped to that
+     wrapper — `.fc-root :where(p) { padding: 0 }` — and :where() carries no
+     specificity, so against .tw-ftr__copy's own 0-1-0 rule it is a tie, and
+     ties go to the file that loads last: css/styles.css. Inside the wrapper
+     the shared footer lost the 16px above its copyright line and stood 129px
+     tall against 145 everywhere else. The shell brings its own reset. -->
+<div data-tw="header"></div>
+
 <div class="fc-root">
 
-  <!-- js/shell.js replaces these two markers with the header and the footer
-       every Top Win landing shares, built from campaign.js. They sit inside
-       .fc-root so this page's scoped reset reaches them. -->
-  <div data-tw="header"></div>
 
   <main class="fc-hero">
 
@@ -114,10 +121,9 @@
     </div>
   </main>
 
-  <div data-tw="footer"></div>
-
-
 </div>
+
+<div data-tw="footer"></div>
 
 <!-- defer, and the order IS the dependency graph: there is no bundler and no
      import anywhere in this repo. The five middle files are tw-lp-template's
