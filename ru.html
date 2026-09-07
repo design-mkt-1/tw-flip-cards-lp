@@ -33,6 +33,12 @@
 <link rel="alternate" hreflang="en" href="./en.html">
 <link rel="alternate" hreflang="x-default" href="./en.html">
 
+<!-- The brand's square mark, the same file on every Top Win landing. Not
+     logo-topwin.svg, which is 247x44 of horizontal type and a smear at 16px.
+     Without it the browser asks for /favicon.ico, which this repo does not
+     ship and the deploy allowlist would not publish. -->
+<link rel="icon" href="assets/img/favicon_topwin.svg" type="image/svg+xml">
+
 <!-- The headline face only. crossorigin is required even same-origin: without
      it the preload is discarded and the font is fetched a second time.
      en.html swaps this for the -latin cut. -->
