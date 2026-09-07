@@ -283,6 +283,36 @@ def script_text() -> tuple:
     return prize, body
 
 
+def card_text() -> set:
+    """Every character the shared registration card can render.
+
+    The card is tw-lp-template's — css/form.css and the markup js/shell.js
+    builds — and it renders in Roboto, not in the Inter/Roboto Flex pair this
+    landing draws its own page with. Its copy is not in the HTML: it is in
+    js/strings.js, which is the template's file, plus the handful of keys
+    campaign.js overrides and the offer figures themselves.
+
+    Both cases are collected. Almost every string in the card is uppercased by
+    CSS — the tabs, the buttons, the titles — and a face has to carry the
+    uppercased form, which is the mistake that put a fallback glyph on a
+    landing once already.
+    """
+    chars = set()
+    for name in ("js/strings.js", "campaign.js"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        # 'key': 'value' — the string tables, and nothing else in the file.
+        # \n inside a value is a line break the shell renders as <br>, not two
+        # characters a face has to carry.
+        for value in re.findall(r"'[\w.]+':\s*'([^']*)'", text):
+            chars |= set(value.replace("\\n", ""))
+        # the offer figures, which interpolate into those strings
+        offer = re.search(r"offer:\s*\{(.*?)\}", text, re.S)
+        if offer:
+            for value in re.findall(r":\s*'([^']*)'", offer.group(1)):
+                chars |= set(value)
+    return chars | {c.upper() for c in chars}
+
+
 def covered_by(files: tuple) -> set:
     chars = set()
     for name in files:
@@ -315,6 +345,15 @@ def check() -> int:
             "body              (everything else)",
             body | js_body,
             ("inter-var-latin.woff2", "inter-var-cyrillic.woff2"),
+        ),
+        (
+            "the shared card   (js/strings.js, campaign.js)",
+            card_text(),
+            ("roboto-latin.woff2", "roboto-latin-ext.woff2",
+             "roboto-cyrillic.woff2", "roboto-latin-italic.woff2",
+             "roboto-latin-ext-italic.woff2", "roboto-cyrillic-italic.woff2",
+             "noto-var-black-italic-hryvnia.woff2",
+             "noto-var-black-upright-hryvnia.woff2"),
         ),
     )
 

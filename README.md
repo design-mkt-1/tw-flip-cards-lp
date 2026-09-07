@@ -21,7 +21,8 @@ python tools/smoke.py           # the pages, in a real browser (needs Playwright
 two viewports, asserting what no text check can see: the page opens at the top,
 nothing is left in flow below the footer, the closed dialog is `display: none`,
 the console is clean. Both guards exist because a bug shipped past everything
-else — section 7 for the fonts one, section 10 of `css/styles.css` for this one.
+else — section 7 for the fonts one, and a closed dialog left in normal flow
+for the other, which is why `smoke.py` measures geometry rather than markup.
 
 | File         | Language  | `<html lang>` |
 |--------------|-----------|---------------|
@@ -39,139 +40,117 @@ and the registration form opens, offering the same welcome bonus, and the six
 cards nobody turned open behind it showing the 50.000 ₴ + 150FS / 25.000 ₴ +
 50FS ladder they were played against.
 
-That is `CONFIG.alwaysWin`, and it is what the campaign asks for. Section 1
-covers turning it off.
+That is `CONFIG.alwaysWin` in `js/flip.js`, and it is what the campaign asks
+for. The deck below it is where the odds live when it is off.
 
 ---
 
 ## 1. What you need to change
 
-Everything in rows 1 to 3 sits inside one commented block at the top of
-`js/flip.js`, between `IT INTEGRATION — START` and `IT INTEGRATION — END`.
+**Everything you wire is in `campaign.js`, at the root of the repo.** It is one
+file of commented settings and nothing else — no build step, no framework.
 
-| # | What                          | Where                                                                 |
-|---|-------------------------------|-----------------------------------------------------------------------|
-| 1 | Where the form submits        | `action=` on `<form id="fc-form">` in all 3 HTML files, **or** `CONFIG.onRegister` |
-| 2 | Extra values on the submission | `CONFIG.hiddenFields` — affiliate id, campaign, CSRF token             |
-| 3 | Terms / Privacy / Login links | `CONFIG.termsUrl`, `CONFIG.privacyUrl`, `CONFIG.loginUrl`              |
-| 4 | Phone country                 | `CONFIG.dialCode`, `CONFIG.dialFlag`, `CONFIG.phoneDigits`             |
-| 5 | Where the confirmation screen's button goes | `CONFIG.siteUrl`                                 |
-| 6 | What the platform is told the bonus was | `CONFIG.bonusCode` — travels as `bonus` on the payload |
-| 7 | Logo click target             | wrap `.fc-plate img` in an `<a>` in each HTML file                     |
+The registration card itself is not this landing's code. It is `tw-lp-template`'s,
+shared with every other Top Win landing so that one design cannot become three
+drawings of itself: `css/tokens.css`, `css/form.css`, `js/strings.js`,
+`js/i18n.js`, `js/form.js` and `js/shell.js` are that repo's files, unmodified.
+**Do not edit them here.** A change one of them needs is made in the template
+and pulled down. `js/flip.js` is the game, and `campaign.js` is the campaign.
+
+| # | What | Where |
+|---|------|-------|
+| 1 | Where the form submits | `form.endpoint` in `campaign.js`, **or** `form.onRegister` |
+| 2 | Extra values on the submission | `form.hiddenFields` — affiliate id, campaign, CSRF token |
+| 3 | Terms / Privacy / Login links | `links.terms`, `links.privacy`, `links.login` |
+| 4 | Phone country | `form.dialCode`, `form.dialFlag`, `form.phoneDigits` |
+| 5 | Where the confirmation screen's button goes | `links.cta` |
+| 6 | What the platform is told the bonus was | `offer.code` — travels as `bonus` on the payload |
+| 7 | The header logo's destination | `links.home` |
+| 8 | Tracking that rides through to the operator | `params` and `passthrough` |
 
 **Rows 1 and 3 block go-live. The rest do not.**
 
 Until row 1 is done the form sends nothing at all: it validates, then writes
-the payload to the browser console and stops. There is no error and no
-message — to a visitor it looks like a completed registration that quietly
-went nowhere. Until row 3 is done, the Terms and Privacy anchors carry **no
-`href` at all** — they are plain text inside the consent label, not links: no
-tab stop, nothing announced, nothing to click. That is the honest state of an
-unfilled seam, but it is not the finished state. A page that collects an 18+
-consent needs the two documents behind it, which is a compliance problem, not
-a cosmetic one.
+the payload to the browser console and walks the confirmation screen anyway —
+to a visitor it looks like a completed registration that quietly went nowhere.
+Until row 3 is done, the Terms and Privacy anchors carry **no `href` at all**:
+they are plain text inside the consent label, which is the honest state of an
+unfilled seam but not the finished one. A page that collects an 18+ consent
+needs the two documents behind it, and that is a compliance problem rather
+than a cosmetic one.
 
-They used to ship as `href="#"`, which is worse than either: a control that
-takes focus, is announced as a link and does nothing. Fixed on 2026-09-07.
+Rows 2 and 4 to 8 all have working defaults and can follow later.
 
-Rows 2, 4, 5, 6 and 7 all have working defaults and can follow later.
-
-`CONFIG.dialFlag` takes either an emoji or a path to an 18 x 18 image, and
-ships as `assets/img/icons/flag-ua.svg`. Windows has no flag glyphs at all —
-Segoe UI Emoji renders 🇺🇦 as the bare letters "UA" — so the emoji the Figma
-file uses cannot be shipped as text.
-
-Marketing can change the prizes in `CONFIG.deck` and the game in
-`CONFIG.alwaysWin`, `winPrizeId` and `winTarget`, also at the top of
-`js/flip.js`.
-
-`alwaysWin` is `true`, which is what the campaign asks for: **the visitor goes
-3 of 3.** Whichever three cards they turn, all three land the top prize, and
-the third one opens the form. The prize is assigned at flip time, and the board
-locks the moment the third winner lands.
-
-The other six are dealt the losing tiers — the top prize is never dealt into
-the grid, or cards nobody turned would sit there holding it — and they open on
-a stagger once the win has landed, dimmed behind the three that won. So the
-board always finishes as exactly three top prizes over the ladder underneath.
-
-Set it to `false` for the original game: three winners hidden among nine, found
-by hunting, with `CONFIG.deck` setting the odds, and the board left as the
-visitor made it. Nothing else has to change.
+`form.dialFlag` takes either an emoji or a path to an 18 × 18 image, and it
+ships as an image because Windows has no flag glyphs: Segoe UI Emoji draws 🇺🇦
+as the bare letters "UA".
 
 ---
 
-## 2. Wiring the form — pick one route
+## 2. Wiring the form
 
-> **Before you wire it: there is a Content-Security-Policy `<meta>` in the head
-> of all three pages.** It deliberately omits `form-action`, so route A can POST
-> to any host today and nothing has to change. If you ever add `form-action` to
-> that policy, add your endpoint's origin with it — and if you point the form at
-> a **different origin** while route B is in use, `connect-src` needs that origin
-> too, because `default-src 'self'` covers `fetch`/`XHR`. A CSP refusal appears
-> **only in the browser console**: the submit will look like it simply did
-> nothing.
+> **There is a Content-Security-Policy `<meta>` in the head of all three
+> pages.** The card posts JSON with `fetch`, and `default-src 'self'` covers
+> that — so an endpoint on **another origin** needs that origin added to
+> `connect-src` in the policy, in all three files. A CSP refusal appears
+> **only in the browser console**: the submit looks like it simply did nothing.
 
-**A. Plain HTML.** Set `action` and `method` on `<form id="fc-form">` in all
-three files. The script validates the fields, then gets out of the way and the
-browser submits the form normally. No JavaScript changes at all.
-
-```html
-<form class="fc-form" id="fc-form" novalidate action="/signup" method="post">
-```
-
-**B. JavaScript.** Leave `action=""` and assign a function. It is called once
-validation passes, and you own the request from that point.
+**A. An endpoint.** Set it in `campaign.js` and the card POSTs JSON to it.
 
 ```js
-onRegister: function (payload, form) {
-  // payload = { method, phone, email, password, consent, lang, bonus, ...hiddenFields }
-  return fetch('/api/signup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }).then(function (r) { return r.json(); })
-    .then(function (d) { return { login: d.login, password: d.password }; });
+form: { endpoint: 'https://api.example.com/signup', ... }
+```
+
+A response carrying `{ "login": "…", "password": "…" }` fills the confirmation
+screen. Any other JSON, or none, and the screen shows what the visitor typed.
+A non-2xx response, or a network failure, shows the card's own error line and
+leaves the visitor on the form.
+
+**B. A function**, when the request needs more than that. It overrides
+`endpoint` and you own the request from the moment validation passes.
+
+```js
+form: {
+  onRegister: function (payload) {
+    // payload = { method, contact, email, phone, password, consent, lang,
+    //             bonus, landing_id, ...hiddenFields, ...params }
+    return fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) { return { login: d.login, password: d.password }; });
+  }
 }
 ```
 
-With neither set, nothing is sent. The validated payload is written to the
-browser console instead, so the page is fully demoable before it is wired.
+With neither set, nothing is sent: the payload goes to `console.info` and,
+because `form.demoDone` is true, the confirmation screen is walked anyway. The
+page is fully demoable before the platform exists — and it says so loudly in
+the console, so it cannot be mistaken for a working integration.
+
+**The `action=` route is gone.** This landing used to let the browser submit
+the form natively; the shared card does not have that route, because a native
+submit navigates away and the confirmation screen is the point of the design.
+Use `endpoint` — it is the same amount of work and one line.
 
 ---
 
 ## 2a. The confirmation screen
 
-The dialog has a second screen: **Реєстрація успішна!**, with the login and
-password your platform issued, a copy button on each, and a button to the
-site. It is a second panel inside the same `<dialog>` — the close button, the
-logo and the offer block are shared — so it swaps in place and the dialog is
+The card has a second panel: **Реєстрація успішна!**, the login and password
+your platform issued, a copy button on each, and a button to the site. The
+logo and the offer block stay; only the body under them swaps, so the card is
 never closed and reopened.
 
-Two ways to reach it, and they match the two routes above.
-
-**Return the credentials.** If `onRegister` returns a promise that resolves
-with `{ login, password }`, the screen fills itself in and appears. That is
-the snippet in route B above.
-
-**Or call it yourself,** at whatever moment suits your flow:
+It appears by itself when the request resolves. To drive it by hand:
 
 ```js
-TWFlip.showDone({ login: '+380 93 123 4567', password: 'a1B2c3D4' });
-TWFlip.showForm();   // back to the form
+TW.showDone({ login: '+380 93 123 4567', password: 'a1B2c3D4' });
 ```
 
-Both values are inserted with `textContent`, never as HTML. Pass `''` for
-either one and that row is hidden. Set `CONFIG.siteUrl` for the orange button;
-left empty it stays inert.
-
-On **route A** the screen never appears — the browser navigates to your
-`action` and your own page renders the result.
-
-To walk the screen end to end before the platform exists, set
-`CONFIG.autoDone: true`. It fires only on the route where nothing is wired at
-all, so it cannot reach production: set an `action` or an `onRegister` and it
-is skipped.
+Both values are inserted with `textContent`, never as HTML. `links.cta` is the
+orange button's destination; left empty it carries no `href` and is inert.
 
 Copying uses `navigator.clipboard`, which needs a secure context. Over `https`
 it works; opened from `file://` it falls back to selecting the text so `Ctrl+C`
@@ -183,10 +162,10 @@ still gets it.
 
 - **No network request of any kind.** No `fetch`, no `XMLHttpRequest`, no
   analytics, no tag manager, no pixels, no cookies.
-- **No password policy** beyond a minimum length (`CONFIG.passwordMinLength`,
-  currently 8). Your platform's real rules will differ, so none were invented.
-- **No CSRF token.** Add it through `CONFIG.hiddenFields`, or as a hidden
-  input in the form.
+- **No password policy** beyond a minimum length (`form.passwordMin` in
+  `campaign.js`, currently 8). Your platform's real rules will differ, so none
+  were invented.
+- **No CSRF token.** Add it through `form.hiddenFields`.
 - **No consent or cookie banner.**
 - **No credentials are invented.** The confirmation screen shows whatever you
   hand it and nothing else; with nothing wired it never opens.
@@ -194,8 +173,9 @@ still gets it.
   deliberate for a campaign page.
 - **Nobody can lose, and nobody turns more than three.** The board locks the
   moment the third card lands, so everyone reaches the form in exactly three
-  clicks. That is the point of a funnel page. `CONFIG.flipBackMs` only matters
-  with `alwaysWin` off, where wrong cards exist and stay face up by default.
+  clicks. That is the point of a funnel page. `CONFIG.flipBackMs` in
+  `js/flip.js` only matters with `alwaysWin` off, where wrong cards exist and
+  stay face up by default.
 
 ---
 
@@ -233,13 +213,13 @@ with a WebP fallback.
   cards deliberately cast no CSS shadow at all.
 - **Remove `overflow: hidden` from `.fc-face`,** or add it to `.fc-flip`.
   Same reason, in reverse.
-- **Move the scrolling back onto `.fc-form`.** The `<dialog>` is the scroll
-  container and `.fc-close` is a sticky sibling of the form, not a child of
-  it. Put `overflow-y: auto` on the card again and the close button scrolls
-  away with the content — on a phone held sideways that leaves no way out.
+- **Edit the card.** `css/tokens.css`, `css/form.css`, `js/strings.js`,
+  `js/i18n.js`, `js/form.js` and `js/shell.js` are `tw-lp-template`'s files.
+  A change one of them needs goes into that repo, where `SHARED.lock` is
+  bumped, and comes back down here. Fixing it in this clone is how one design
+  became three drawings of itself in the first place.
 - **Reuse the class name `fc-copy` for anything new.** It is already the
-  hero's copy block, and it is `position: absolute`. The copy buttons on the
-  confirmation screen are `fc-cred__copy` for exactly that reason.
+  hero's copy block, and it is `position: absolute`.
 
 ---
 
@@ -264,13 +244,17 @@ their **tag sequences** must be identical element for element. The second one
 is what catches a reordered tab or a panel nested one level deeper — the
 character count alone would not.
 
-Every element carrying translatable text also has a `data-i18n` attribute.
-Nothing reads it. It is a marker, so the diff has a stable anchor and so a
-future move to runtime translations is mechanical rather than a rewrite.
+Every element carrying translatable text also has a `data-i18n` attribute,
+and since the card became shared code those attributes ARE read: `js/i18n.js`
+renders them from `campaign.js § strings` for the page's own language. The
+words in the HTML are still what paints first and what a crawler sees, so the
+two have to agree — change one, change the other, in the same commit.
 
-The eight or so strings that depend on what the visitor has done — card
-labels for screen readers, the progress announcement, validation errors —
-are in the `MESSAGES` table at the top of `js/flip.js`, keyed by language.
+The strings that depend on what the visitor has done — card labels for screen
+readers, the progress announcement — are in the `MESSAGES` table at the top of
+`js/flip.js`. **Everything the registration card says is in `js/strings.js`,**
+which is the template's file and the same in every Top Win landing; the
+handful of words this campaign owns override it from `campaign.js`.
 
 ---
 
@@ -380,7 +364,8 @@ These are load-bearing. Please keep them when you integrate.
 
 1. The phone prefix stays Ukrainian, `+380`, in the Russian and English
    versions too. That is how the Figma file is drawn. If this campaign is not
-   Ukraine-only, change `CONFIG.dialCode`, `dialFlag` and `phoneDigits`.
+   Ukraine-only, change `form.dialCode`, `form.dialFlag` and
+   `form.phoneDigits` in `campaign.js`.
 2. Figma styles the two consent links green only in the Ukrainian version, and
    sets the copyright line in bold only in the Russian one. Both were
    normalised across all three languages.

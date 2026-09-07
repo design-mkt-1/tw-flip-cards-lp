@@ -111,7 +111,7 @@ jobs:
       - name: Stage the served files
         run: |
           mkdir -p _site
-          cp -r index.html ru.html en.html .nojekyll css js assets _site/
+          cp -r index.html ru.html en.html campaign.js .nojekyll css js assets _site/
           du -sh _site
 
       - uses: actions/configure-pages@v5

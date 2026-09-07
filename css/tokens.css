@@ -1,0 +1,307 @@
+/* Top Win design tokens
+   Figma mAJyDSaXdr9GO72b7FGvI8 — Palette (19:5312), Typography (19:5583),
+   and the delivered screens: Registration Form 19:4559, Footer 19:3717. */
+
+/* ── Self-hosted type ──────────────────────────────────────────
+   One family for the whole page. Roboto here is the variable font with BOTH
+   axes -- wght 100-900 and wdth 75-100 -- plus a real italic cut, which is
+   what the design actually asks for and what the files this repo started with
+   could not give: they carried wght only, no width axis and no italic.
+
+   That matters because the card's promo headline is Roboto Condensed Black
+   Italic (Figma 19:4565 -- weight 900, wdth 75, italic). With the width axis
+   present that is this same family at font-stretch: 75%, not a second
+   download. "Roboto Condensed" is never named as its own family anywhere in
+   this stylesheet, and must not be: it is a coordinate, not a font.
+
+   The brandbook prescribes Russo One for headlines, but no delivered screen
+   uses it -- it appears only on the brandbook's own pages. The screens are
+   the specification here, so Russo One is not shipped. Inter is likewise
+   absent: the designer set the card and footer UI text in it, the brandbook
+   says Roboto, and Roboto is what we follow. Neither is a font substitution
+   forced by a missing file -- Russo One and Roboto both resolve correctly in
+   the Figma file, so Inter was a deliberate choice we are deliberately not
+   carrying.
+
+   Eight woff2 -- six Roboto, one per unicode subset per style, so a Ukrainian
+   page never downloads a face it cannot show and an all-roman page never
+   touches the italic cut, plus two one-glyph Noto cuts for the hryvnia sign
+   (see below). Nothing is fetched from Google at runtime. Licence: OFL.txt.
+
+   Ukrainian coverage is verified, not assumed: і ї є ґ І Ї Є Ґ all live in
+   the cyrillic subsets, roman and italic both. Apostrophes do not -- the
+   cyrillic range stops short of them -- so a UA apostrophe is served from
+   the latin subset, which is preloaded regardless. */
+
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-latin-italic.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-latin-ext-italic.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/roboto-cyrillic-italic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* ── The hryvnia sign, U+20B4 ──────────────────────────────────
+   Not Roboto, because Roboto has no hryvnia -- not at any weight, width or
+   release, and not in the cyrillic-ext subset whose advertised unicode-range
+   claims to carry it. Figma cannot draw it either, so the artboards show a
+   fallback face and are no reference. Noto Sans Black is Google's companion
+   to Roboto and the closest match: cap height 714/1000 against Roboto's
+   1456/2048.
+
+   This shipped as a live bug once, on nine cards in three languages, and
+   nothing failed loudly because a missing glyph still renders something.
+   `python tools/fonts.py --check` fails instead.
+
+   Declared across the full weight range rather than at 900 alone: a hryvnia
+   in body copy must render, and a face declared only at 900 would not be
+   picked for it -- which is the original bug wearing a different hat. The
+   cost is that the sign is always drawn from a Black cut.
+   ponytail: always-Black hryvnia; cut a Regular subset if it ever reads wrong
+   next to small text. */
+
+@font-face {
+  font-family: "Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/noto-var-black-upright-hryvnia.woff2") format("woff2");
+  unicode-range: U+20B4;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("../assets/fonts/noto-var-black-italic-hryvnia.woff2") format("woff2");
+  unicode-range: U+20B4;
+}
+
+:root {
+  /* ── Palette ──────────────────────────────────────────────────
+     Two hero colours, Orange Fire and Midnight Navy, plus supporting greys
+     and functional signals. The 500 of each ramp is the brandbook value,
+     verbatim; every other step is that value mixed with white (50-400) or
+     black (600-950) in sRGB at a fixed schedule -- 92/84/68/42/20% white,
+     16/34/52/70/84% black. Stated because it is reproducible: a new tint
+     is a mix, not a guess. This is the whole reason the ramps exist. At
+     fs-penalty three greens invented by hand -- #30d158, #3dd629, #3fd62b --
+     ended up in three stylesheets, all meant to be the same green.
+
+     The brandbook is not self-consistent and the ramps do not paper over it:
+       - "BG SECONDARY" lists HEX #FF4500 next to RGB(243,244,245). The RGB is
+         right; the hex is a copy-paste of Orange Fire. Figma's card confirms
+         it -- input backgrounds there are #F3F4F5.
+       - "BG THIRD" is defined twice, as #DCDEEA on one page and #FFDACC on
+         the next. Both are kept below under names that say which is which,
+         so nobody has to pick one and be silently wrong. */
+
+  /* Orange Fire */
+  --orange-50:  #fff0eb;
+  --orange-100: #ffe1d6;
+  --orange-200: #ffc3ad;
+  --orange-300: #ff936b;
+  --orange-400: #ff6a33;
+  --orange-500: #ff4500;   /* brandbook: Orange Fire, RGB(255,69,0) */
+  --orange-600: #d63a00;
+  --orange-700: #a82e00;
+  --orange-800: #7a2100;
+  --orange-900: #4c1500;
+  --orange-950: #290b00;
+
+  /* Midnight Navy */
+  --navy-50:  #ededf4;
+  --navy-100: #dadae8;
+  --navy-200: #b5b5d1;
+  --navy-300: #7a7aac;
+  --navy-400: #47478d;
+  --navy-500: #191970;     /* brandbook: Midnight Navy, RGB(25,25,112) */
+  --navy-600: #15155e;
+  --navy-700: #10104a;
+  --navy-800: #0c0c36;
+  --navy-900: #080822;
+  --navy-950: #040412;
+
+  /* Neutrals and backgrounds, all brandbook values */
+  --white:         #ffffff;   /* BG main */
+  --bg-secondary:  #f3f4f5;   /* RGB(243,244,245); see the hex note above */
+  --bg-third:      #dcdeea;   /* BG THIRD, palette page 1 */
+  --bg-peach:      #ffdacc;   /* BG THIRD, palette page 2 -- same name, other colour */
+  --bg-dark:       #1f1f1f;   /* BG DARK */
+  --stroke:        #e7e6e9;   /* Stroke colour */
+  --txt-main:      #2a2a2a;
+  /* The design draws this at #737b8c, which is 4.25:1 on white and 4.19 on the
+     input grey -- under WCAG AA's 4.5 for text this size. Darkened until it
+     clears on both, measured from the rendered colours rather than from the
+     hex. It is used only on the card, so nothing on the navy stage moves. */
+  --txt-secondary: #5f6673;   /* design: #737b8c */
+
+  /* Functional signals */
+  --green: #00a75c;   /* success, and the T&C links in the card */
+  --red:   #e41e1e;
+
+  /* ── Signals on a light background ────────────────────────────
+     The 500s are hero colours for large type and filled shapes. As small text
+     on white they are 3.4:1 (orange) and 3.1:1 (green), both under AA, so the
+     card's links take a darker step from the same ramp schedule -- 600 is 16%
+     black, 700 is 34% -- rather than a colour invented for the occasion.
+     Nothing else changes: the CTA keeps Orange Fire and darkens its ink. */
+  --green-700: #006e3d;
+  --accent-on-light: var(--orange-600);
+  --green-on-light:  var(--green-700);
+
+  /* Delivered values that are not in the palette but are in the screens */
+  --footer-bg: #00002e;   /* Footer 19:3717 */
+  --footer-fg: #9ca3af;
+  --footer-brd:#22223b;
+
+  /* Header chrome, Figma 1:3797 "Header Mobile". Dark iOS-style controls that
+     belong to the bar, not to the palette -- but they are colours, and any
+     colour written outside this file is how the four oranges happened. They
+     live here so tools/tokens.py has nothing to find in css/shell.css.
+     --chrome-hint is #9a9aa0 rather than the design's #8e8e93, which is
+     4.3:1 on --chrome-menu. The same substitution the card documents. */
+  --chrome-bar:      rgba(11, 11, 13, .72);
+  --chrome-hair:     rgba(255, 255, 255, .06);
+  --chrome-ctl:      #3a3a3c;
+  --chrome-ctl-brd:  rgba(255, 255, 255, .14);
+  --chrome-menu:     #2c2c2e;
+  --chrome-menu-brd: #38383a;
+  --chrome-hint:     #9a9aa0;
+  --chrome-hover:    rgba(255, 255, 255, .09);
+  --chrome-shadow:   0 8px 24px rgba(0, 0, 0, .4);
+  --flag-ring:       rgba(255, 255, 255, .22);
+  --pay-bg:          rgba(25, 25, 112, .2);   /* --navy-500 at 20%, written out:
+                                                 color-mix is newer than the
+                                                 oldest iOS this runs on. */
+  --plate-shadow:    drop-shadow(0 1.4px .7px rgba(0, 0, 0, .25));
+
+  /* ── Semantic ─────────────────────────────────────────────────
+     What the rest of the stylesheets are allowed to ask for. Nothing outside
+     this file reaches for a ramp step by number; when it did, the colour
+     stopped tracking the brand and had to be chased down by hand later. */
+  --accent:        var(--orange-500);
+  --accent-press:  var(--orange-600);
+  /* Ink on the accent. The design sets white, which is 3.44:1 on Orange Fire --
+     under AA on the one control the whole page exists to get pressed. Dark ink
+     clears it comfortably and, unlike a darker button, leaves the hero colour
+     exactly as the brandbook specifies it. */
+  --accent-ink:    var(--bg-dark);    /* design: white on orange, 3.44:1 */
+  --accent-soft:   var(--orange-300); /* tints of the accent, for gradients */
+  --second:        var(--navy-500);
+  --second-soft:   var(--navy-200);   /* legible on the navy glass plate */
+  --surface:       var(--navy-900);   /* the stage */
+  --surface-sunken:var(--navy-950);   /* the page behind it */
+  --surface-raised:var(--navy-800);
+  --surface-field: var(--bg-secondary);
+  --text:          var(--white);
+  --text-muted:    var(--txt-secondary);
+  --danger:        var(--red);
+
+  /* Glass plate, brandbook guideline 011 */
+  --glass-bg: linear-gradient(160deg, rgba(255,255,255,.13), rgba(255,255,255,.03));
+  --glass-brd: rgba(255,255,255,.22);
+  --glass-blur: 10px;
+
+  /* Coloured glass plate. Navy where fs-penalty had purple: it is the second
+     hero colour, so the ×12 corners read as brand rather than as decoration. */
+  --glass-second-bg: linear-gradient(160deg, rgba(25,25,112,.42), rgba(8,8,34,.20));
+  --glass-second-brd: rgba(181,181,209,.42);
+
+  /* ── Type ─────────────────────────────────────────────────────
+     One family, two axes. --font-stretch-tight is the condensed coordinate
+     the promo headline sits at; it is a token rather than a literal so the
+     headline and anything that has to match it cannot drift apart. */
+  --font: "Roboto", system-ui, -apple-system, sans-serif;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semi: 600;
+  --fw-bold: 700;
+  --fw-xbold: 800;
+  --fw-black: 900;
+  --font-stretch-tight: 75%;
+
+  /* ── Motion ─────────────────────────────────────── */
+  /* The one curve, used by the header controls, the language menu and the
+     dialog. New motion extends this set rather than forking a curve of its
+     own, which is the only reason it has a name. */
+  --ease-out: cubic-bezier(.2, .9, .3, 1);
+
+  /* ── Radii / elevation ────────────────────────────────────── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* The dialog's own three. Named here rather than written into css/form.css
+     because a shadow is a colour: the last two landings each invented their
+     own AA-safe orange the same way, by typing one into the file that needed
+     it. All three are ramp values at an alpha, not new colours.
+
+     --scrim is deliberately not aliased to --chrome-bar, which happens to
+     carry the same .72 alpha within three points of this colour. The header
+     bar and the dialog scrim are two surfaces; naming one after the other is
+     how a value stops tracking the thing it belongs to. */
+  --scrim:       rgba(4, 4, 18, .72);       /* --navy-950 at 72% */
+  --shadow-card: 0 12px 12px rgba(25, 25, 112, .08);  /* --navy-500 at 8% */
+  --shadow-cta:  0 4px 6px rgba(255, 69, 0, .19);     /* --orange-500 at 19% */
+
+  --glow-accent: 0 0 24px rgba(255,69,0,.45);
+  --glow-second: 0 0 28px rgba(25,25,112,.55);
+}

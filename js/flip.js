@@ -12,79 +12,10 @@
 
   var CONFIG = {
 
-    /* ────────────────────────────────────────────────────────────────────
-       IT INTEGRATION — START
-
-       There are two ways to wire up the registration form. Pick one.
-
-       A. PLAIN HTML  (recommended, needs no JavaScript knowledge)
-          Set action and method on <form id="fc-form"> in index.html,
-          ru.html and en.html. This script validates the fields, then steps
-          out of the way and lets the browser submit the form normally.
-
-       B. JAVASCRIPT HOOK
-          Leave action empty and assign a function to onRegister below. It
-          is called with (payload, form) once validation passes, and you own
-          the request from that point.
-
-          If it returns a promise that resolves with { login, password },
-          the confirmation screen fills itself in and swaps into the open
-          dialog. Return nothing and the dialog is left alone — call
-          TWFlip.showDone({ login: …, password: … }) yourself instead.
-
-       With neither set, NOTHING IS SENT. The validated payload is written to
-       the browser console instead, so the page is fully demoable before it
-       is wired.
-       ──────────────────────────────────────────────────────────────────── */
-
-    onRegister: null,        // function (payload, form) { ... }
-
-    /* Extra values your platform needs on the submission: affiliate id,
-       campaign, landing id, CSRF token. Each becomes a hidden input. */
-    hiddenFields: {
-      // promo_code: 'FLIP650',
-      // landing_id: 'tw-flip-cards'
-    },
-
-    /* Destinations for the links that are deliberately left unwired.
-       Empty means the anchor gets NO href at all — it is not a tab stop, is
-       not announced as a link, and cannot be clicked, which is the honest
-       state of a seam nobody has filled in. It used to stay href="#", which
-       offers a control that does nothing.
-
-       termsUrl and privacyUrl block go-live: the form collects an 18+
-       consent, and consent text with no documents behind it is a compliance
-       problem, not a cosmetic one. */
-    termsUrl:   '',
-    privacyUrl: '',
-    loginUrl:   '',
-
-    /* Where the orange button on the confirmation screen goes. */
-    siteUrl:    '',
-
-    /* What the platform is told the visitor was promised. It travels on the
-       payload as `bonus`. Since the cards were redrawn in hryvnia the top
-       card and the dialog now promise the same thing, but this stays a string
-       you set rather than one derived from the deck. */
-    bonusCode:  '250000+250',
-
-    /* Demo switch, and only that. It can only ever fire on the route where
-       nothing is wired, so it is structurally unreachable in production:
-       set an action or an onRegister and it is skipped. Turn it on to walk
-       the confirmation screen end to end before the platform exists. */
-    autoDone:   false,
-
-    /* The phone country. Change all three together.
-       dialFlag takes either an emoji or a path to an 18x18 image. It ships as
-       an image because Windows has no flag glyphs at all: Segoe UI Emoji
-       renders 🇺🇦 as the bare letters "UA". */
-    dialCode:    '+380',
-    dialFlag:    'assets/img/icons/flag-ua.svg',
-    phoneDigits: 9,          // digits expected after the dial code
-
-    /* IT INTEGRATION — END
-       ──────────────────────────────────────────────────────────────────── */
-
+    /* Everything IT wires — the form endpoint, the four link destinations,
+       the hidden fields, the phone country, the bonus code — moved to
+       campaign.js when the registration card became tw-lp-template's. This
+       file is the mechanic and nothing else now. See README.md section 1. */
 
     /* ── Game. Marketing can tune these. ─────────────────────────────── */
 
@@ -152,13 +83,7 @@
          "знайдено" would describe a game that is no longer being played. */
       progress:   'Перевернуто {n} з 3 карток',
       win:        'Усі три картки перевернуто. Відкриваємо форму реєстрації.',
-      errPhone:   'Введіть 9 цифр номера',
-      errEmail:   'Введіть коректну адресу email',
       errPassword:'Пароль має містити щонайменше {n} символів',
-      errConsent: 'Потрібно підтвердити, що вам є 18 років',
-      copied:     'Скопійовано',
-      showPass:   'Показати пароль',
-      hidePass:   'Сховати пароль'
     },
     ru: {
       fsLabel:    'FS',
@@ -170,13 +95,7 @@
       p25k:  '25 тысяч гривен плюс 50 фриспинов',
       progress:   'Перевёрнуто {n} из 3 карт',
       win:        'Все три карты перевёрнуты. Открываем форму регистрации.',
-      errPhone:   'Введите 9 цифр номера',
-      errEmail:   'Введите корректный адрес email',
       errPassword:'Пароль должен содержать не менее {n} символов',
-      errConsent: 'Нужно подтвердить, что вам есть 18 лет',
-      copied:     'Скопировано',
-      showPass:   'Показать пароль',
-      hidePass:   'Скрыть пароль'
     },
     en: {
       fsLabel:    'FS',
@@ -188,13 +107,7 @@
       p25k:  '25 thousand hryvnia plus 50 free spins',
       progress:   'Turned {n} of 3 cards',
       win:        'All three cards turned. Opening the registration form.',
-      errPhone:   'Enter the 9 digits of your number',
-      errEmail:   'Enter a valid email address',
       errPassword:'Password must be at least {n} characters',
-      errConsent: 'Please confirm that you are 18 or older',
-      copied:     'Copied',
-      showPass:   'Show password',
-      hidePass:   'Hide password'
     }
   };
 
@@ -250,8 +163,6 @@
   var progress = $('#fc-progress');
   var status   = $('#fc-status');
   var claim    = $('#fc-claim');
-  var modal    = $('#fc-signup');
-  var form     = $('#fc-form');
 
   var state = { found: 0, locked: false, lastCard: null, opened: false };
 
@@ -532,317 +443,39 @@
 
 
   /* ======================================================================
-     Modal
+     The registration card
 
-     <dialog>.showModal() gives the focus trap, Escape, the inert background
-     and top-layer rendering for free. Top layer matters here: the grid is
-     full of preserve-3d stacking contexts, and a plain z-indexed overlay
-     loses to those in Safari.
+     It is tw-lp-template's, whole: js/shell.js builds it from campaign.js,
+     js/form.js drives it. The focus trap, Escape, the top layer, the two
+     tabs, the validation, the phone normalisation, the confirmation screen
+     and its copy buttons all live there now, in code every Top Win landing
+     shares. What stood here was a second implementation of the same design,
+     and the two had already drifted: a checkbox that shipped unticked, a
+     deeper orange on the button, a login link in a different colour.
+
+     What is left is the seam. TWForm.open() is the entire coupling between
+     a mechanic and the card.
      ====================================================================== */
 
   function openModal() {
-    if (!modal || modal.open) return;
+    if (!window.TWForm) return;
     state.opened = true;
-    modal.showModal();
+
+    /* js/form.js hands focus back to whatever held it when the card opened.
+       The win sequence opens from a timer, so give it the card the visitor
+       turned last -- otherwise focus returns to <body> and the keyboard
+       path restarts at the top of the page. */
+    if (state.lastCard) state.lastCard.focus({ preventScroll: true });
+
+    /* The page behind the card scrolls; the template's landings do not, so
+       this rule is this campaign's. <dialog> makes the background inert, not
+       unscrollable. */
     document.documentElement.classList.add('fc-noscroll');
+    TWForm.open();
   }
 
   function closeModal() {
-    if (!modal || !modal.open) return;
-    modal.close();
-  }
-
-  function onModalClose() {
-    document.documentElement.classList.remove('fc-noscroll');
-    if (state.lastCard) state.lastCard.focus();
-  }
-
-
-  /* ======================================================================
-     Form
-     ====================================================================== */
-
-  var tabPhone = $('#fc-tab-phone');
-  var tabEmail = $('#fc-tab-email');
-  var panelPhone = $('#fc-panel-phone');
-  var panelEmail = $('#fc-panel-email');
-  var method = 'email';
-
-  function setTab(next) {
-    method = next;
-    var onPhone = next === 'phone';
-
-    tabPhone.setAttribute('aria-selected', onPhone ? 'true' : 'false');
-    tabEmail.setAttribute('aria-selected', onPhone ? 'false' : 'true');
-    tabPhone.tabIndex = onPhone ? 0 : -1;
-    tabEmail.tabIndex = onPhone ? -1 : 0;
-
-    panelPhone.hidden = !onPhone;
-    panelEmail.hidden = onPhone;
-
-    clearError(panelPhone);
-    clearError(panelEmail);
-  }
-
-  function onTabKey(ev) {
-    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
-    ev.preventDefault();
-    var next = method === 'phone' ? 'email' : 'phone';
-    setTab(next);
-    (next === 'phone' ? tabPhone : tabEmail).focus();
-  }
-
-  function showError(field, msg, errEl) {
-    field.setAttribute('data-invalid', '');
-    field.removeAttribute('data-valid');
-    var input = field.querySelector('input');
-    if (input) input.setAttribute('aria-invalid', 'true');
-    /* role="alert" on the message element is what makes it announce when
-       focus is somewhere else. Moving focus to the field as well covers the
-       case where the visitor is already reading further down.
-
-       Written only when it changes: blur grades a field and so does submit,
-       and rewriting the same string re-fires the alert for no reason. */
-    if (errEl && errEl.textContent !== msg) errEl.textContent = msg;
-  }
-
-  function clearError(field) {
-    if (!field) return;
-    field.removeAttribute('data-invalid');
-    field.removeAttribute('data-valid');
-    var input = field.querySelector('input');
-    if (input) input.removeAttribute('aria-invalid');
-    var err = field.querySelector('.fc-error');
-    if (err) err.textContent = '';
-  }
-
-  /* The green tick. Nothing is announced: it is aria-hidden, and the absence
-     of an error already carries the information for anyone not looking. */
-  function markValid(field) {
-    if (!field) return;
-    clearError(field);
-    field.setAttribute('data-valid', '');
-  }
-
-  /* One definition of "good" per field, so the live pass and the submit pass
-     can never disagree about what they are drawing. */
-  function okPhone()    { return $('#fc-phone').value.replace(/\D/g, '').length === CONFIG.phoneDigits; }
-  /* Deliberately loose. A full RFC 5322 pattern is unreadable and rejects
-     addresses that work. The real check belongs on the server. */
-  function okEmail()    { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test($('#fc-email').value.trim()); }
-  /* Length only. Real complexity rules live in the platform and will differ
-     from anything invented here. */
-  function okPassword() { return $('#fc-password').value.length >= CONFIG.passwordMinLength; }
-
-  /* blur grades, input only ever de-escalates. Grading on blur is what lets
-     the tick appear for someone who fills the form correctly the first time;
-     without it the success state could only be reached by failing a submit.
-     An empty field stays neutral — pristine is not wrong. */
-  function onFieldBlur(field, input, ok, key, errEl) {
-    if (!input.value) { clearError(field); return; }
-    if (ok()) markValid(field);
-    else showError(field, t(key, { n: CONFIG.passwordMinLength }), errEl);
-  }
-
-  /* Never introduces red. It promotes a corrected field straight to the tick
-     and demotes a broken one to neutral, rather than flashing an error at
-     someone in the middle of retyping. */
-  function onFieldInput(field, ok) {
-    if (field.hasAttribute('data-invalid')) { if (ok()) markValid(field); }
-    else if (field.hasAttribute('data-valid') && !ok()) clearError(field);
-  }
-
-  function validate() {
-    var firstBad = null;
-    var pwField = $('#fc-password').closest('.fc-field');
-    var consentRow = $('#fc-consent-row');
-
-    clearError(panelPhone);
-    clearError(panelEmail);
-    clearError(pwField);
-    consentRow.removeAttribute('data-invalid');
-    $('#fc-err-consent').textContent = '';
-
-    if (method === 'phone') {
-      if (okPhone()) markValid(panelPhone);
-      else {
-        showError(panelPhone, t('errPhone'), $('#fc-err-phone'));
-        firstBad = firstBad || $('#fc-phone');
-      }
-    } else {
-      if (okEmail()) markValid(panelEmail);
-      else {
-        showError(panelEmail, t('errEmail'), $('#fc-err-email'));
-        firstBad = firstBad || $('#fc-email');
-      }
-    }
-
-    if (okPassword()) markValid(pwField);
-    else {
-      showError(pwField, t('errPassword', { n: CONFIG.passwordMinLength }),
-                $('#fc-err-password'));
-      firstBad = firstBad || $('#fc-password');
-    }
-
-    if (!$('#fc-consent').checked) {
-      consentRow.setAttribute('data-invalid', '');
-      $('#fc-err-consent').textContent = t('errConsent');
-      firstBad = firstBad || $('#fc-consent');
-    }
-
-    if (firstBad) firstBad.focus();
-    return !firstBad;
-  }
-
-  function readPayload() {
-    var p = {
-      method: method,
-      phone: method === 'phone'
-        ? CONFIG.dialCode + $('#fc-phone').value.replace(/\D/g, '')
-        : '',
-      email: method === 'email' ? $('#fc-email').value.trim() : '',
-      password: $('#fc-password').value,
-      consent: $('#fc-consent').checked,
-      lang: lang,
-      bonus: CONFIG.bonusCode
-    };
-    for (var k in CONFIG.hiddenFields) {
-      if (Object.prototype.hasOwnProperty.call(CONFIG.hiddenFields, k)) {
-        p[k] = CONFIG.hiddenFields[k];
-      }
-    }
-    return p;
-  }
-
-  function onSubmit(ev) {
-    if (!validate()) { ev.preventDefault(); return; }
-
-    /* Route A: IT set an action, so let the browser submit it normally. */
-    if (form.getAttribute('action')) return;
-
-    ev.preventDefault();
-    var payload = readPayload();
-
-    /* Route B */
-    if (typeof CONFIG.onRegister === 'function') {
-      var answer = CONFIG.onRegister(payload, form);
-      /* If the handler hands back a promise carrying credentials, swap the
-         dialog to the confirmation screen. Anything else — undefined, or a
-         promise that resolves with nothing — leaves the dialog untouched,
-         and IT can call TWFlip.showDone() at whatever moment suits them.
-         The empty rejection handler is there so a failed request does not
-         surface as an unhandled rejection in their console. */
-      if (answer && typeof answer.then === 'function') {
-        answer.then(function (res) {
-          if (res && (res.login || res.password)) showDone(res);
-        }, function () {});
-      }
-      return;
-    }
-
-    console.info(
-      '[tw-flip-cards] The form is valid but not wired to anything. ' +
-      'Set an action on <form id="fc-form">, or CONFIG.onRegister at the ' +
-      'top of js/flip.js. See README.md section 2. Payload:', payload);
-
-    /* Demo only, and only on this branch — see CONFIG.autoDone. */
-    if (CONFIG.autoDone) {
-      showDone({ login: payload.phone || payload.email, password: payload.password });
-    }
-  }
-
-  /* ======================================================================
-     The confirmation screen
-
-     A second panel inside the same <form>, under the same shell: the close
-     button, the logo and the offer block sit above both and are shared. The
-     dialog is never closed and reopened, so `close` never fires and focus is
-     never thrown back to the card the visitor came from mid-flow.
-     ====================================================================== */
-
-  var panelSignup = $('#fc-panel-signup');
-  var panelDone   = $('#fc-panel-done');
-  var copyTimer   = 0;
-
-  function showDone(data) {
-    if (!panelDone) return;
-    data = data || {};
-    var login = data.login || '';
-    var pass  = data.password || '';
-
-    /* textContent, never innerHTML: these two strings come off the wire. */
-    $('#fc-done-login').textContent = login;
-    $('#fc-done-pass').textContent  = pass;
-    $('#fc-cred-login').hidden = !login;
-    $('#fc-cred-pass').hidden  = !pass;
-
-    panelSignup.hidden = true;
-    panelDone.hidden   = false;
-
-    /* The dialog's accessible name follows the screen it is showing. */
-    modal.setAttribute('aria-labelledby', 'fc-done-title');
-
-    /* The submit button that was just pressed is display:none now, so the
-       browser has already dropped focus to <body>. Landing it on the heading
-       announces the screen and puts the tab sequence at the top of it. Not
-       on #fc-go: one stray Enter would take the visitor off the page. */
-    $('#fc-done-title').focus();
-  }
-
-  function showForm() {
-    if (!panelDone) return;
-    panelDone.hidden   = true;
-    panelSignup.hidden = false;
-    modal.setAttribute('aria-labelledby', 'fc-offer-title');
-  }
-
-  function announceCopy(msg) {
-    /* #fc-copy-status, not #fc-status: showModal() makes everything outside
-       the dialog inert, and a live region in an inert subtree is unreliable.
-       Cleared after a moment so copying the same value twice announces twice. */
-    var el = $('#fc-copy-status');
-    if (!el) return;
-    el.textContent = msg;
-    window.clearTimeout(copyTimer);
-    copyTimer = window.setTimeout(function () { el.textContent = ''; }, 2400);
-  }
-
-  function onCopy(ev) {
-    var src = $('#' + ev.currentTarget.getAttribute('data-copy'));
-    if (!src || !src.textContent) return;
-
-    function done() { announceCopy(t('copied')); }
-
-    /* navigator.clipboard needs a secure context. https is fine; file:// and
-       plain http on a LAN address are not, and someone will open the html by
-       double-clicking it sooner or later. The fallback selects the text, so
-       the value is at worst one Ctrl+C away rather than unreachable. */
-    function select() {
-      try {
-        var range = document.createRange();
-        range.selectNodeContents(src);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        if (document.execCommand && document.execCommand('copy')) done();
-      } catch (err) { /* the text stays selected; that is the fallback */ }
-    }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(src.textContent).then(done, select);
-    } else {
-      select();
-    }
-  }
-
-
-  function togglePassword() {
-    var input = $('#fc-password');
-    var btn = $('#fc-eye');
-    var show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
-    btn.setAttribute('aria-label', t(show ? 'hidePass' : 'showPass'));
+    if (window.TWForm) TWForm.close();
   }
 
 
@@ -850,108 +483,35 @@
      Boot
      ====================================================================== */
 
-  function applyLinks() {
-    var map = [['#fc-terms', 'termsUrl'], ['#fc-privacy', 'privacyUrl'],
-               ['#fc-login', 'loginUrl'], ['#fc-go', 'siteUrl']];
-    for (var i = 0; i < map.length; i++) {
-      var el = $(map[i][0]);
-      var url = CONFIG[map[i][1]];
-      if (!el) continue;
-      /* Set or REMOVE, never leave what the markup had. The four anchors ship
-         with no href, so the else branch is a no-op today — it is here so the
-         rule lives in one place and cannot drift from the HTML the way
-         href="#" did across three files. */
-      if (url) { el.setAttribute('href', url); el.rel = 'noopener'; }
-      else { el.removeAttribute('href'); }
-    }
-  }
-
-  function applyDialCode() {
-    var flag = $('.fc-input__flag');
-    var dial = $('.fc-input__dial');
-    if (flag) {
-      if (/\.(svg|png|webp|avif|gif|jpe?g)$/i.test(CONFIG.dialFlag)) {
-        var img = document.createElement('img');
-        img.src = CONFIG.dialFlag;
-        img.width = 18;
-        img.height = 18;
-        img.alt = '';
-        flag.textContent = '';
-        flag.appendChild(img);
-      } else {
-        flag.textContent = CONFIG.dialFlag;
-      }
-    }
-    if (dial) dial.textContent = CONFIG.dialCode;
-  }
-
-  function addHiddenFields() {
-    for (var k in CONFIG.hiddenFields) {
-      if (!Object.prototype.hasOwnProperty.call(CONFIG.hiddenFields, k)) continue;
-      var input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = k;
-      input.value = CONFIG.hiddenFields[k];
-      form.appendChild(input);
-    }
-  }
-
-  function bindField(field, input, ok, key, errEl) {
-    if (!field || !input) return;
-    input.addEventListener('blur', function () { onFieldBlur(field, input, ok, key, errEl); });
-    input.addEventListener('input', function () { onFieldInput(field, ok); });
-  }
-
   function init() {
-    if (!grid || !form || !modal) return;
+    if (!grid) return;
 
     buildGrid();
-    applyLinks();
-    applyDialCode();
-    addHiddenFields();
-
     grid.addEventListener('click', onGridClick);
-
     if (claim) claim.addEventListener('click', openModal);
-    modal.addEventListener('close', onModalClose);
-    $('#fc-close').addEventListener('click', closeModal);
-
-    /* Clicking the backdrop closes. The dialog element itself fills the top
-       layer, so a click that lands on it and not on the form is a backdrop
-       click. */
-    modal.addEventListener('click', function (ev) {
-      if (ev.target === modal) closeModal();
-    });
-
-    tabPhone.addEventListener('click', function () { setTab('phone'); });
-    tabEmail.addEventListener('click', function () { setTab('email'); });
-    tabPhone.addEventListener('keydown', onTabKey);
-    tabEmail.addEventListener('keydown', onTabKey);
-
-    $('#fc-eye').addEventListener('click', togglePassword);
-    form.addEventListener('submit', onSubmit);
-
-    bindField(panelEmail, $('#fc-email'), okEmail, 'errEmail', $('#fc-err-email'));
-    bindField(panelPhone, $('#fc-phone'), okPhone, 'errPhone', $('#fc-err-phone'));
-    bindField($('#fc-password').closest('.fc-field'), $('#fc-password'),
-              okPassword, 'errPassword', $('#fc-err-password'));
-
-    var copies = form.querySelectorAll('.fc-cred__copy');
-    for (var c = 0; c < copies.length; c++) {
-      copies[c].addEventListener('click', onCopy);
-    }
-
     setPips(0);
 
-    /* The public surface. showDone is the one IT needs; the rest is there so
-       the board and the dialog can be driven by hand during QA. */
+    /* The card's own close, backdrop click, tab switching, validation, eye
+       toggle and copy buttons were all wired here. js/form.js owns them now,
+       for every Top Win landing at once.
+
+       One thread does come back. This page scrolls behind the card, and
+       <dialog> makes the background inert, not unscrollable: openModal()
+       locks the page and the shell says when to let go. */
+    if (window.TW) {
+      TW.on('formclose', function () {
+        document.documentElement.classList.remove('fc-noscroll');
+      });
+    }
+
+    /* The public surface, kept for QA: drive the board by hand without
+       turning nine cards. The card itself answers on TWForm / TW. */
     window.TWFlip = {
       config:   CONFIG,
       state:    state,
       open:     openModal,
       close:    closeModal,
-      showDone: showDone,
-      showForm: showForm
+      showDone: function (res) { if (window.TWForm) TWForm.showDone(res); }
     };
   }
 

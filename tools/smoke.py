@@ -113,8 +113,12 @@ def serve(root):
 # element even when it is perfectly visible, and this button is sticky.
 MEASURE = """() => {
   const footer = document.querySelector('.fc-footer');
-  const dialog = document.getElementById('fc-signup');
-  const close  = document.getElementById('fc-close');
+  /* The card is tw-lp-template's now: js/shell.js appends it to <body> as
+     #tw-signup, and js/form.js owns its close button. The ids changed; what
+     is asserted about them did not, and this is the assertion that caught a
+     closed dialog left in normal flow. */
+  const dialog = document.getElementById('tw-signup');
+  const close  = document.querySelector('.tw-close');
   return {
     scrollY:       Math.round(window.scrollY),
     scrollHeight:  document.documentElement.scrollHeight,
@@ -149,7 +153,7 @@ PLAYED = """(positions) => {
   const api  = window.TWFlip;
   const top  = api.config.deck.find(p => p.id === api.config.winPrizeId);
   const grid = document.getElementById('fc-grid');
-  const dlg  = document.getElementById('fc-signup');
+  const dlg  = document.getElementById('tw-signup');
   const cells = positions.map(p => document.querySelector('.fc-cell[data-pos="' + p + '"]'));
   return {
     found:    api.state.found,
@@ -213,7 +217,7 @@ def play(page):
             'window.TWFlip.state.found === window.TWFlip.config.winTarget',
             timeout=5000)
         page.wait_for_function(
-            '() => document.getElementById("fc-signup").open', timeout=5000)
+            '() => document.getElementById("tw-signup").open', timeout=5000)
         # The rest of the board opens on a stagger after that.
         page.wait_for_function(
             '() => [...document.querySelectorAll(".fc-cell")]'
@@ -255,7 +259,7 @@ def play(page):
         bad.append('#fc-grid never reached data-phase="reveal" (it is %r), so '
                    'the board never reacted to the win' % m['phase'])
     if not m['dialogOpen']:
-        bad.append('#fc-signup did not open after the third win -- the visitor '
+        bad.append('#tw-signup did not open after the third win -- the visitor '
                    'reaches no form')
 
     # The six nobody turned. They open showing what the deck built them as.
@@ -300,17 +304,17 @@ def check(page, url, errors):
                           m['scrollHeight'], m['footerBottom']))
 
     if not m['dialogFound']:
-        bad.append('no #fc-signup dialog on the page')
+        bad.append('no #tw-signup dialog on the page')
     elif m['dialogOpen']:
-        bad.append('#fc-signup is open on load')
+        bad.append('#tw-signup is open on load')
     else:
         if m['dialogDisplay'] != 'none':
-            bad.append("closed #fc-signup computes display: %s, not none -- the "
+            bad.append("closed #tw-signup computes display: %s, not none -- the "
                        "UA's dialog:not([open]) rule is being beaten by a class"
                        % m['dialogDisplay'])
         if m['closeDrawn']:
-            bad.append('#fc-close draws a box while the dialog is closed, so '
-                       'its autofocus can fire at load')
+            bad.append("the card's close button draws a box while the dialog "
+                       "is closed, so the card is in flow when it should not be")
 
     # The console errors are NOT folded in here. play() runs after this on the
     # same page, and anything it throws has to land in the same list.
