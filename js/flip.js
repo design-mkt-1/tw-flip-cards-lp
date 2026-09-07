@@ -126,11 +126,27 @@
       : { flip: 520, hold: 240, reveal: 240 };
   }
 
-  var lang = (document.documentElement.lang || 'en').slice(0, 2);
-  var M = MESSAGES[lang] || MESSAGES.en;
+  /* The table is looked up on every call, never captured once.
+
+     Until 2026-09-07 this landing served one pre-translated HTML file per
+     language, so the language could not change after load and freezing it
+     here was safe. It serves ONE file for all three now, and the header menu
+     swaps the table in place: a captured `M` would leave every card's
+     accessible name and every progress announcement in whichever language the
+     visitor happened to arrive in, for the rest of the session. Nothing would
+     look wrong on screen -- the nine cards draw digits -- which is exactly why
+     it has to be a lookup and not a variable.
+
+     Keyed off <html lang>, which js/i18n.js rewrites to the real BCP-47 tag
+     BEFORE it notifies anyone: 'uk' here, not the internal 'ua' code, which
+     is why this table's keys are uk/ru/en. */
+  function messages() {
+    var tag = (document.documentElement.lang || 'en').slice(0, 2);
+    return MESSAGES[tag] || MESSAGES.en;
+  }
 
   function t(key, vars) {
-    var s = M[key] || key;
+    var s = messages()[key] || key;
     if (vars) {
       for (var k in vars) {
         if (Object.prototype.hasOwnProperty.call(vars, k)) {
@@ -300,6 +316,33 @@
       n: cell.dataset.pos,
       prize: t(cell.dataset.prize)
     });
+  }
+
+  /* Which of the three label keys a cell should be carrying, read off its own
+     state. setLabel writes the label; this is what decides which one. */
+  function labelKey(cell) {
+    if (cell.dataset.face !== 'front') return 'cardBack';
+    return 'win' in cell.dataset ? 'cardWin' : 'cardFront';
+  }
+
+  /* The nine accessible names are written into the DOM once, when a card is
+     built or turned, so they do not follow a language change on their own.
+     This is what makes them follow it. Wired to TW's 'lang' event in init().
+
+     #fc-status is deliberately NOT rewritten here. It is aria-live="polite":
+     writing to it makes a screen reader speak, and speaking the progress
+     sentence again because someone opened the language menu would be an
+     announcement the visitor did nothing to cause. The stale sentence is
+     never re-read where it sits, and the next card they turn announces in the
+     new language.
+
+     The visible prize text is not rewritten either, and does not need to be:
+     it is digits plus fsLabel, which is the string 'FS' in all three tables
+     because that is how the artboards draw it in every language. */
+  function relabel() {
+    if (!grid) return;
+    var cells = grid.querySelectorAll('.fc-cell');
+    for (var i = 0; i < cells.length; i++) setLabel(cells[i], labelKey(cells[i]));
   }
 
   /* The top prize, read out of the deck rather than written down a second
@@ -502,6 +545,13 @@
       TW.on('formclose', function () {
         document.documentElement.classList.remove('fc-noscroll');
       });
+
+      /* The second thread. js/i18n.js re-renders every [data-i18n] node in the
+         page, and the nine cards carry none: their accessible names are built
+         here, from the MESSAGES table above. Without this, switching to
+         English left a screen reader reading "Картка 4 з 9" over a board the
+         rest of the page had already translated. */
+      TW.on('lang', relabel);
     }
 
     /* The public surface, kept for QA: drive the board by hand without

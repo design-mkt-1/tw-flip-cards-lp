@@ -25,13 +25,23 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
-<title>TopWin — Переверни картки, забери свій бонус!</title>
-<meta name="description" content="Переверни три картки і забери вітальний бонус 250.000 ₴ + 250FS у TopWin.">
+<!-- Static, because a crawler and a link preview read the head before any
+     script runs. js/i18n.js then re-renders the title per language from
+     campaign.js § strings, the same way tw-lp-template's index.html does.
 
-<link rel="alternate" hreflang="uk" href="./index.html">
-<link rel="alternate" hreflang="ru" href="./ru.html">
-<link rel="alternate" hreflang="en" href="./en.html">
-<link rel="alternate" hreflang="x-default" href="./en.html">
+     The description deliberately does NOT follow: a <meta> is not a data-i18n
+     node and nothing re-renders it, so it stays in the default locale. That
+     is the template's behaviour, and it is the one thing three separate HTML
+     files used to give us for free.
+
+     No <link rel="alternate" hreflang> any more, because there is nothing to
+     point at: ru.html and en.html are gone and ?lang=ru is the same document,
+     which is not a separate URL a crawler can index as Russian. This page is
+     indexed in Ukrainian only. If search coverage in RU/EN is ever wanted,
+     that needs real per-language URLs from the host's routing, not a link
+     element here. -->
+<title data-i18n="title">TopWin — Переверни картки, забери свій бонус!</title>
+<meta name="description" content="Переверни три картки і забери вітальний бонус 250.000 ₴ + 250FS у TopWin.">
 
 <!-- The brand's square mark, the same file on every Top Win landing. Not
      logo-topwin.svg, which is 247x44 of horizontal type and a smear at 16px.
@@ -39,11 +49,18 @@
      ship and the deploy allowlist would not publish. -->
 <link rel="icon" href="assets/img/favicon_topwin.svg" type="image/svg+xml">
 
-<!-- The headline face only. crossorigin is required even same-origin: without
-     it the preload is discarded and the font is fetched a second time.
-     en.html swaps this for the -latin cut. -->
+<!-- The headline face, both cuts. crossorigin is required even same-origin:
+     without it the preload is discarded and the font is fetched a second time.
+
+     BOTH, because one file now serves all three languages. en.html used to
+     swap this line for the -latin cut and there is no en.html any more, so a
+     visitor who picks EN from the menu would otherwise watch the headline
+     reflow while the latin cut is fetched. tw-lp-template preloads its two
+     the same way, for the same reason. -->
 <link rel="preload" as="font" type="font/woff2" crossorigin
       href="assets/fonts/roboto-var-black-italic-cyrillic.woff2">
+<link rel="preload" as="font" type="font/woff2" crossorigin
+      href="assets/fonts/roboto-var-black-italic-latin.woff2">
 
 <!-- The registration card is tw-lp-template's, so its three stylesheets are
      too, unmodified. Order matters: reset, then tokens, then the card, then

@@ -29,7 +29,14 @@ jobs:
   # The checks run on pull requests as well as pushes. They used to live inside
   # build, which only ran after a merge, so every guard here reported a problem
   # that was already on main. The hryvnia font bug reached production that way.
-  parity:
+  #
+  # There was a third job here, `parity`, until 2026-09-07. It compared
+  # index.html, ru.html and en.html tag for tag, and it existed for one reason:
+  # this landing served a pre-translated HTML file per language and the three
+  # copies drifted. They are one file now, so there is nothing left to compare
+  # -- one file cannot drift from itself. The fonts check below is the part of
+  # that job that was never about parity, and it stays.
+  fonts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,38 +44,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: The three language files must stay structurally identical
-        run: |
-          for f in index.html ru.html en.html; do
-            printf '%s: %s lines, %s tags\n' "$f" "$(wc -l < $f)" "$(grep -o '<' $f | wc -l)"
-          done
-          a=$(grep -o '<' index.html | wc -l)
-          for f in ru.html en.html; do
-            b=$(grep -o '<' $f | wc -l)
-            if [ "$a" != "$b" ]; then
-              echo "::error::$f has $b tags, index.html has $a. The files have drifted."
-              echo "Compare them with: git diff --no-index --word-diff index.html $f"
-              exit 1
-            fi
-          done
-
-      - name: The tag sequences must match, element for element
-        run: |
-          python3 - <<'PY'
-          import re, io
-          seq = lambda p: re.findall(r'</?([a-zA-Z][\w-]*)', io.open(p, encoding='utf-8').read())
-          a = seq('index.html')
-          for f in ('ru.html', 'en.html'):
-              b = seq(f)
-              if a != b:
-                  i = next(i for i, (x, y) in enumerate(zip(a + [None] * 9, b + [None] * 9)) if x != y)
-                  raise SystemExit(
-                      '::error::%s diverges at tag #%d: index.html has <%s>, %s has <%s>. '
-                      'Compare them with: git diff --no-index --word-diff index.html %s'
-                      % (f, i, a[i], f, b[i], f))
-          print('tag sequences match: %d tags' % len(a))
-          PY
 
       # Roboto has no hryvnia sign. Nobody noticed when the cards were redrawn
       # in hryvnia, because a missing glyph still renders in a fallback face.
@@ -78,7 +53,7 @@ jobs:
           python3 -m pip install --quiet fonttools brotli
           python3 tools/fonts.py --check
 
-  # parity reads the files; this one looks at the rendered page. The class of
+  # fonts reads the files; this one looks at the rendered page. The class of
   # bug it exists for is invisible to every text check: a `display: flex` that
   # was never scoped to [open] left the CLOSED dialog in flow, so the site
   # opened at its own footer with 650px of blank page under it, and CI was
@@ -92,14 +67,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: The pages must open at the top, with nothing left in flow below the footer
+      - name: The page must open at the top in every language, with nothing left in flow below the footer
         run: |
           python3 -m pip install --quiet playwright
           python3 -m playwright install --with-deps chromium
           python3 tools/smoke.py
 
   build:
-    needs: [parity, smoke]
+    needs: [fonts, smoke]
     # A pull request gets the checks above and stops there. Only main is built
     # and deployed; configure-pages and upload-pages-artifact have no business
     # running on a branch that nobody has merged yet.
@@ -111,7 +86,7 @@ jobs:
       - name: Stage the served files
         run: |
           mkdir -p _site
-          cp -r index.html ru.html en.html campaign.js .nojekyll css js assets _site/
+          cp -r index.html campaign.js .nojekyll css js assets _site/
           du -sh _site
 
       - uses: actions/configure-pages@v5

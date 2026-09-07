@@ -62,16 +62,29 @@ contents of this archive to any web server or object store.
 Everything is referenced with RELATIVE paths, so it runs from the root of a
 domain or from a subfolder without an edit.
 
-## 0. Three files, three languages
+## 0. One file, three languages
 
-    index.html   Ukrainian   <html lang="uk">
-    ru.html      Russian     <html lang="ru">
-    en.html      English     <html lang="en">
+    index.html   Ukrainian, Russian and English
 
-They are structurally identical; only the words differ, and `<link
-rel="alternate" hreflang>` in each head points at the other two. Mount them
-wherever your routing expects — /ua/, /ru/, /en/ is fine. There is no
-`?lang=` switch and no language menu: one file is one language.
+There is one HTML page. The globe in the header opens a language menu; the
+page re-renders in place, with no reload and no second URL, and the choice is
+remembered in the browser under `localStorage['tw-lang']`.
+
+`index.html?lang=ru` — or `?lang=en`, or `?lang=ua` — forces one language for
+that visit. That is what an advertising creative written in one language
+should link to. It is deliberately NOT remembered: a link that forces a
+language must not overwrite what the visitor picked last time.
+
+Ukrainian is the default and is what the page paints before any script runs,
+so it is also what `<title>` and `<meta name="description">` hand to a
+crawler or a link preview. If the page has to be INDEXED in Russian or
+English, that needs real separate URLs from your routing; the archive carries
+no `hreflang` claiming they exist.
+
+**This landing shipped three pre-translated HTML files until 2026-09-07.** If
+anything you run — routing, an ad, a QR code — still points at `/ru.html` or
+`/en.html`, those two URLs are gone and will answer 404. `?lang=ru` and
+`?lang=en` on index.html are the replacements.
 
 ## 1. campaign.js is the only file you edit
 
@@ -132,10 +145,10 @@ cannot be mistaken for a working integration.
 browser submit the form natively. The shared card does not: a native submit
 navigates away, and the confirmation screen is the point of the design.
 
-**The Content-Security-Policy `<meta>` in all three heads.** The card posts
-with `fetch`, which `default-src 'self'` covers — so an endpoint on ANOTHER
-origin needs that origin added to `connect-src`, in all three files. A CSP
-refusal appears only in the console: the submit looks like it did nothing.
+**The Content-Security-Policy `<meta>` in the head of index.html.** The card
+posts with `fetch`, which `default-src 'self'` covers — so an endpoint on
+ANOTHER origin needs that origin added to `connect-src`. A CSP refusal appears
+only in the console: the submit looks like it did nothing.
 
 ## 4. Tracking, and the affiliate click id
 
@@ -154,8 +167,8 @@ lost here and nowhere else.
 
 `analytics.gtmId` / `analytics.metaPixelId` are empty and with both empty the
 page makes no third-party request at all. Setting either also needs the CSP
-`<meta>` in all three files swapped for the analytics one — a meta policy
-cannot be written from JavaScript.
+`<meta>` in index.html swapped for the analytics one — a meta policy cannot be
+written from JavaScript.
 
 ## 5. The offer
 
@@ -252,7 +265,7 @@ def main() -> int:
     # The check. Cheap, and it is the whole reason to have a script.
     with zipfile.ZipFile(zip_path) as z:
         names = z.namelist()
-    for required in ("index.html", "ru.html", "en.html", "campaign.js"):
+    for required in ("index.html", "campaign.js"):
         assert required in names, f"handoff: the archive has no {required}"
     leaked = [n for n in names if n.split("/")[0] in NEVER
               or any(d in n.split("/") for d in SKIP_DIRS)]

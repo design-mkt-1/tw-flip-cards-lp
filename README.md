@@ -17,21 +17,37 @@ python tools/fonts.py --check   # every character the page renders is in the fon
 python tools/smoke.py           # the pages, in a real browser (needs Playwright)
 ```
 
-`smoke.py` serves the project on a loopback port and loads all three pages at
-two viewports, asserting what no text check can see: the page opens at the top,
-nothing is left in flow below the footer, the closed dialog is `display: none`,
-the console is clean. Both guards exist because a bug shipped past everything
-else — section 7 for the fonts one, and a closed dialog left in normal flow
-for the other, which is why `smoke.py` measures geometry rather than markup.
+`smoke.py` serves the project on a loopback port and loads the page once per
+language at each of two viewports, asserting what no text check can see: the
+page opens at the top, nothing is left in flow below the footer, the closed
+dialog is `display: none`, the console is clean, and the visitor still goes
+3 of 3. Both guards exist because a bug shipped past everything else — section
+7 for the fonts one, and a closed dialog left in normal flow for the other,
+which is why `smoke.py` measures geometry rather than markup.
 
-| File         | Language  | `<html lang>` |
-|--------------|-----------|---------------|
-| `index.html` | Ukrainian | `uk`          |
-| `ru.html`    | Russian   | `ru`          |
-| `en.html`    | English   | `en`          |
+**One HTML file, three languages.** `index.html` is the whole page. The globe
+in the header swaps the language in place — no reload, no second URL — and the
+choice is kept in `localStorage['tw-lang']`. `?lang=ru`, `?lang=en` or
+`?lang=ua` forces one for a single visit, which is what a one-language ad
+creative should link to; it is not persisted, so it cannot overwrite what the
+visitor chose before.
 
-The three files are structurally identical. Only the text differs. Mount them
-wherever your routing expects, for example `/ua/`, `/ru/` and `/en/`.
+Ukrainian is the default: it is what is written in the markup, so it is what
+paints before any script runs and what a crawler and a link preview read out
+of `<title>` and `<meta name="description">`.
+
+> **`ru.html` and `en.html` were deleted on 2026-09-07** and those two URLs now
+> 404. Anything still pointing at them — routing, an ad, a QR code — has to move
+> to `?lang=ru` / `?lang=en`. The page also carries no `hreflang` any more,
+> because there is nothing left to point at: `?lang=ru` is the same document,
+> not a URL a search engine can index as Russian. Indexing per language would
+> need real per-language URLs from the host's routing.
+
+Until that day this landing served one pre-translated HTML file per language.
+It cost two CI jobs whose only purpose was to notice that three copies of the
+same page had drifted apart, and it made the language menu a navigation
+control: picking a language reloaded the page. One file cannot drift from
+itself.
 
 **The game:** nine cards face down. **The visitor goes 3 of 3** — whichever
 three cards they turn, all three land the 250.000 ₴ + 250FS top prize. There
@@ -89,11 +105,11 @@ as the bare letters "UA".
 
 ## 2. Wiring the form
 
-> **There is a Content-Security-Policy `<meta>` in the head of all three
-> pages.** The card posts JSON with `fetch`, and `default-src 'self'` covers
-> that — so an endpoint on **another origin** needs that origin added to
-> `connect-src` in the policy, in all three files. A CSP refusal appears
-> **only in the browser console**: the submit looks like it simply did nothing.
+> **There is a Content-Security-Policy `<meta>` in the head of `index.html`.**
+> The card posts JSON with `fetch`, and `default-src 'self'` covers that — so
+> an endpoint on **another origin** needs that origin added to `connect-src` in
+> the policy. A CSP refusal appears **only in the browser console**: the submit
+> looks like it simply did nothing.
 
 **A. An endpoint.** Set it in `campaign.js` and the card POSTs JSON to it.
 
@@ -225,36 +241,47 @@ with a WebP fallback.
 
 ## 6. Editing the copy
 
-`index.html` is the master. Make structural changes there first, then apply
-the same change to `ru.html` and `en.html` in the same commit.
+`index.html` is the only page. **Translations are not in it** — they are in
+`campaign.js § strings`, one block per language, and `js/i18n.js` renders every
+element carrying a `data-i18n` attribute from there.
 
-**Keep translated text on the same line as the original.** That one rule is
-what makes this check work:
+There are five such keys and they are this landing's own copy:
 
-```
-git diff --no-index --word-diff=color index.html ru.html
-```
+| Key          | Where it renders                                  |
+|--------------|---------------------------------------------------|
+| `title`      | `<title>` in the head                             |
+| `hero.1`     | the white headline line                           |
+| `hero.2`     | the gold headline line                            |
+| `game.label` | the board's heading, for screen readers only      |
+| `cta.claim`  | the claim button under the board                  |
 
-Only translated words should appear in that output. A tag, a class or an
-`href` in it means the files have drifted apart.
+The Ukrainian for four of them is **also written into `index.html` as real
+text**, because that is what paints before any script runs and what a crawler
+reads. The two have to agree — change one, change the other, in the same
+commit. `title` is the exception only in that the head's copy is likewise the
+Ukrainian one.
 
-The GitHub Actions workflow runs two mechanical versions of the same check on
-every push: the three files must carry the same number of `<` characters, and
-their **tag sequences** must be identical element for element. The second one
-is what catches a reordered tab or a panel nested one level deeper — the
-character count alone would not.
+`<meta name="description">` has no key and is not translated. A `<meta>` is
+not a `data-i18n` node, nothing re-renders it, and it stays in the default
+locale — the one thing three separate HTML files used to give us for free.
 
-Every element carrying translatable text also has a `data-i18n` attribute,
-and since the card became shared code those attributes ARE read: `js/i18n.js`
-renders them from `campaign.js § strings` for the page's own language. The
-words in the HTML are still what paints first and what a crawler sees, so the
-two have to agree — change one, change the other, in the same commit.
+Two mechanical CI checks used to guard this section: the three files had to
+carry the same number of `<` characters and identical tag sequences. Both are
+gone with the files they compared.
 
-The strings that depend on what the visitor has done — card labels for screen
-readers, the progress announcement — are in the `MESSAGES` table at the top of
-`js/flip.js`. **Everything the registration card says is in `js/strings.js`,**
-which is the template's file and the same in every Top Win landing; the
-handful of words this campaign owns override it from `campaign.js`.
+The strings that depend on what the visitor has done — the card labels for
+screen readers, the progress announcement — are in the `MESSAGES` table at the
+top of `js/flip.js`, keyed by BCP-47 tag (`uk` / `ru` / `en`) rather than by
+our internal codes. That table is **looked up on every call, never captured
+once**, and `js/flip.js` re-writes the nine card labels on `TW.on('lang')`.
+Freezing it was safe while one file was one language; it is not any more, and
+the failure would be silent — the cards draw digits, so nothing on screen
+would look wrong while a screen reader read the board in the language the
+visitor arrived in.
+
+**Everything the registration card says is in `js/strings.js`,** which is the
+template's file and the same in every Top Win landing; the handful of words
+this campaign owns override it from `campaign.js`.
 
 ---
 
@@ -390,8 +417,8 @@ These are load-bearing. Please keep them when you integrate.
 4. **The registration form is only drawn in Ukrainian** (`19:2017`); only the
    footer has all three languages. The Russian and English strings in the form
    and on the confirmation screen were translated here and should be read by
-   someone who owns the copy. The amount is now written `250.000 ₴` on all
-   three pages: Figma spelled it `250000 ГРН` in the dialog and `250.000 ₴` on
+   someone who owns the copy. The amount is now written `250.000 ₴` in all
+   three languages: Figma spelled it `250000 ГРН` in the dialog and `250.000 ₴` on
    the cards, and the owner picked the card notation for both (2026-09-04).
    Free spins are `FS` in every language for the same reason — the Ukrainian
    artboards use the Latin form on both surfaces.

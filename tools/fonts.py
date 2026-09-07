@@ -66,7 +66,14 @@ from fontTools.ttLib import TTFont
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "raw" / "fonts"
 OUT = ROOT / "assets" / "fonts"
-PAGES = ("index.html", "ru.html", "en.html")
+# One page, all three languages, since 2026-09-07. It used to be three
+# pre-translated HTML files, and reading all three is how the Russian and
+# English copy reached this check at all. Those words live in campaign.js §
+# strings now, so page_text() below follows them there -- see the note on
+# campaign_i18n(). Dropping the two files without that would have left --check
+# green while it silently stopped covering two headlines out of three, which
+# is the exact shape of the hryvnia bug this file exists for.
+PAGES = ("index.html",)
 
 CSS_API = "https://fonts.googleapis.com/css2?family="
 
@@ -241,9 +248,49 @@ def strip_markup(html: str) -> str:
     return re.sub(r"<[^>]*>", " ", html)
 
 
+def campaign_i18n() -> dict:
+    """{key: {characters}} for every string in campaign.js § strings.
+
+    Every locale's value for a key is folded into one set, because one HTML
+    file now renders all of them: the Ukrainian in the markup is only what
+    paints first, and js/i18n.js swaps in the Russian or the English on the
+    spot when the visitor uses the menu. A face that carries only what is
+    written in index.html covers one language out of three.
+
+    Deliberately not a JS parser -- the same regex tactic card_text() uses on
+    the same file. \\n inside a value is a line break the shell renders as a
+    <br>, not two characters a face has to carry.
+    """
+    text = (ROOT / "campaign.js").read_text(encoding="utf-8")
+    start = text.find("strings:")
+    if start < 0:
+        return {}
+    out = {}
+    for key, value in re.findall(r"'([\w.]+)':\s*'([^']*)'", text[start:]):
+        out.setdefault(key, set()).update(value.replace("\\n", ""))
+    return out
+
+
+def i18n_nodes(html: str) -> list:
+    """(tag, key, class attribute) for every data-i18n node in the page.
+
+    The markup is what says which face a key renders in, so it is what decides
+    which group the key's translations are checked against. Restating that map
+    in this file would be a second copy to forget -- the mistake the comment in
+    styles.css made when it said cyrillic-ext was not needed, and quietly
+    stopped being right.
+    """
+    out = []
+    for m in re.finditer(r'<(\w+)((?:[^>]*?)\bdata-i18n="([\w.]+)"[^>]*)>', html):
+        cls = re.search(r'class="([^"]*)"', m.group(2))
+        out.append((m.group(1), m.group(3), cls.group(1) if cls else ""))
+    return out
+
+
 def page_text() -> tuple:
     """Split every page's text into what the display family renders and the rest."""
     display, body = set(), set()
+    strings = campaign_i18n()
     for name in PAGES:
         html = (ROOT / name).read_text(encoding="utf-8")
         rest = html
@@ -259,6 +306,24 @@ def page_text() -> tuple:
                 display |= set(text) | set(text.upper())
                 rest = rest.replace(m.group(0), " ")
         body |= set(strip_markup(rest))
+
+        # The other two languages of the same nodes. The loop above sees only
+        # the Ukrainian written in the file; these are the words the menu puts
+        # in their place at runtime.
+        for tag, key, cls in i18n_nodes(html):
+            # <title data-i18n="title"> draws in the browser's tab, in the
+            # browser's own font. Nothing this repo ships renders it.
+            if tag.lower() == "title":
+                continue
+            chars = strings.get(key, set())
+            # Uppercased unconditionally. .fc-headline and .fc-claim are both
+            # text-transform: uppercase, and asking for the uppercased form of
+            # a node that is not is a stricter check, never a wrong one.
+            chars = chars | {c.upper() for c in chars}
+            if any(c in DISPLAY_CLASSES for c in cls.split()):
+                display |= chars
+            else:
+                body |= chars
     return display, body
 
 

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Headless smoke test. Loads every page in a real browser and asserts the things
-a human notices in the first second and no text check can see.
+Headless smoke test. Loads the page in a real browser, once per language and
+per viewport, and asserts the things a human notices in the first second and
+no text check can see.
+
+It was three HTML files until 2026-09-07 and is one file plus ?lang= now, so
+this loops over campaign.js § languages instead of over a list of filenames --
+the shape tools/smoke.py has in tw-lp-template.
 
 Run by hand, from the project root:
 
@@ -54,8 +59,9 @@ recurrence there would size differently from a recurrence on desktop.
 Then it plays the game, which is the second thing no text check can see. The
 campaign requires the visitor to go 3 of 3: whichever cards they turn, all
 three land the top prize (CONFIG.alwaysWin, js/flip.js). Nothing else in CI
-touches game logic -- parity compares tags, fonts.py compares glyphs -- so a
-regression that quietly restored the old hunt, or that promoted the attribute
+touches game logic -- fonts.py compares glyphs and that is the whole of the
+rest of it -- so a regression that quietly restored the old hunt, or that
+promoted the attribute
 without the visible prize, would go green through all of it. That is the same
 shape as both bugs above: nothing fails, it is just wrong.
 
@@ -82,11 +88,27 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 
-PAGES = ('index.html', 'ru.html', 'en.html')
+PAGE = 'index.html'
 
 # Desktop is the Figma frame width; mobile is the 375 frame the modal has its
 # own rules for, in a viewport tall enough that 100svh means something.
 VIEWPORTS = (('desktop', 1440, 900), ('mobile', 375, 812))
+
+
+def languages():
+    """The campaign's own list, read out of campaign.js without running it.
+
+    This loop used to be over three HTML files. It is one file and three
+    languages since 2026-09-07, which is the shape tools/smoke.py has in
+    tw-lp-template. Reading the list rather than writing it down here means
+    adding a fourth language is one edit in campaign.js and not two.
+    """
+    text = (ROOT / 'campaign.js').read_text(encoding='utf-8')
+    start = text.find('languages:')
+    if start < 0:
+        return ['ua']
+    chunk = text[start:text.find(']', start)]
+    return [bit.strip().strip('\'"') for bit in chunk.split('[')[1].split(',') if bit.strip()]
 
 
 class Skipped(Exception):
@@ -325,6 +347,7 @@ def check(page, url, errors):
 def main():
     httpd, base = serve(ROOT)
     failures = 0
+    langs = languages()
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
@@ -340,22 +363,27 @@ def main():
                         if msg.type == 'error' else None)
                 page.on('pageerror', lambda exc: errors.append('uncaught: %s' % exc))
 
-                for html in PAGES:
+                # ?lang= forces one language for the load, the way a media
+                # buyer's creative does. js/i18n.js does not persist it, so
+                # the three runs cannot contaminate each other through the
+                # localStorage entry they share inside this one context.
+                for lang in langs:
                     errors.clear()
-                    bad, m = check(page, '%s/%s' % (base, html), errors)
+                    where = '%s?lang=%s' % (PAGE, lang)
+                    bad, m = check(page, '%s/%s' % (base, where), errors)
                     played = '3 of 3'
                     try:
                         bad.extend(play(page))
                     except Skipped as why:
                         played = 'game not played (%s)' % why
                     bad.extend(errors)
-                    label = '%s @ %s' % (html, name)
+                    label = '%s @ %s' % (where, name)
                     if bad:
                         failures += len(bad)
                         for line in bad:
                             print('::error::%s: %s' % (label, line))
                     else:
-                        print('ok  %-22s scrollY %d, %dpx tall, footer ends at '
+                        print('ok  %-30s scrollY %d, %dpx tall, footer ends at '
                               '%d, dialog display: none, %s'
                               % (label, m['scrollY'], m['scrollHeight'],
                                  m['footerBottom'], played))
@@ -368,8 +396,8 @@ def main():
     if failures:
         print('\nsmoke: %d failure%s' % (failures, '' if failures == 1 else 's'))
         return 1
-    print('\nsmoke: %d pages x %d viewports, all clean'
-          % (len(PAGES), len(VIEWPORTS)))
+    print('\nsmoke: 1 page x %d languages x %d viewports, all clean'
+          % (len(langs), len(VIEWPORTS)))
     return 0
 
 

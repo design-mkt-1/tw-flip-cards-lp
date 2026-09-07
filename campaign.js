@@ -71,7 +71,7 @@ window.TW_CAMPAIGN = {
   passthrough: ['click_id', 'sub1', 'sub2', 'gclid', 'fbclid', 'ttclid'],
 
   /* Both empty means not one third-party request. Setting either also needs
-     the CSP <meta> in all three HTML files swapped for the analytics one. */
+     the CSP <meta> in index.html swapped for the analytics one. */
   analytics: {
     gtmId:       '',
     metaPixelId: '',
@@ -99,24 +99,20 @@ window.TW_CAMPAIGN = {
   },
 
   /* ── Languages ────────────────────────────────────────────────
-     All three, in header-menu order. This landing serves one pre-translated
-     HTML file per language with hreflang between them, so the menu is a
-     navigation control: see languageUrls below.
+     All three, in header-menu order, and ONE HTML file for all of them.
+     The menu swaps the table in place, the choice is kept in localStorage
+     under 'tw-lang', and ?lang=ru forces one for an ad creative — the
+     template's model, in js/i18n.js.
+
+     There is no `languageUrls` here any more. This landing shipped three
+     pre-translated HTML files until 2026-09-07, which meant the menu was a
+     navigation control: picking a language reloaded the page. It also meant
+     two CI jobs whose entire purpose was to notice that three copies of the
+     same page had drifted apart. One file cannot drift from itself.
 
      'ua' is the internal code and 'uk' the real language tag; the map is in
      js/strings.js § TW_LOCALES, and <html lang> carries the tag. */
   languages: ['ua', 'ru', 'en'],
-
-  /* One language per file, so the menu navigates instead of re-rendering:
-     <html lang> on the file decides which table is used, and neither ?lang
-     nor a stale localStorage entry can override it. Before tw-lp-template
-     v1.0.6 offered this, `languages` here held a single code read off
-     <html lang> — safe, but it meant no menu at all. */
-  languageUrls: {
-    ua: './index.html',
-    ru: './ru.html',
-    en: './en.html'
-  },
 
   /* ── Brand and chrome ─────────────────────────────────────────
      The bar and the footer are the shared ones now, built by js/shell.js
@@ -149,15 +145,24 @@ window.TW_CAMPAIGN = {
                       qualifier under a headline. Here the amount IS the
                       headline, so it is the figure alone.
 
-     The four page keys below are this landing's own copy — the hero, the
-     board's label and the claim button. The footer's two lines used to be
-     here too; they are the shell's now (footer.pay / footer.copy in
-     js/strings.js), which is what "the same footer everywhere" means. They are ALSO written into
-     the three HTML files as real text, which is what paints before any
-     script runs and what a crawler reads; js/i18n.js then renders the same
-     words from here. Change one, change both. */
+     The five page keys below are this landing's own copy — the document
+     title, the hero, the board's label and the claim button. The footer's two
+     lines used to be here too; they are the shell's now (footer.pay /
+     footer.copy in js/strings.js), which is what "the same footer everywhere"
+     means.
+
+     Four of the five are ALSO written into index.html as real text, which is
+     what paints before any script runs and what a crawler reads; js/i18n.js
+     then renders the same words from here. Change one, change both.
+
+     'title' is the fifth and is the <title data-i18n="title"> in the head.
+     There is no matching <meta name="description"> key: a meta is not a
+     data-i18n node, nothing re-renders it, and the description stays in the
+     default locale. Ukrainian is that locale because it is first in
+     `languages` above. */
   strings: {
     ua: {
+      'title':           'TopWin — Переверни картки, забери свій бонус!',
       'promo.title':     'Вітальний казино бонус',
       'promo.amount':    '{amount} {currency}',
       'hero.1':          'Переверни картки',
@@ -166,6 +171,7 @@ window.TW_CAMPAIGN = {
       'cta.claim':       'Забрати бонус'
     },
     ru: {
+      'title':           'TopWin — Переверни карты, забери свой бонус!',
       'promo.title':     'Приветственный казино бонус',
       'promo.amount':    '{amount} {currency}',
       'hero.1':          'Переверни карты',
@@ -174,6 +180,7 @@ window.TW_CAMPAIGN = {
       'cta.claim':       'Забрать бонус'
     },
     en: {
+      'title':           'TopWin — Flip the cards, claim your bonus!',
       'promo.title':     'Welcome casino bonus',
       'promo.amount':    '{amount} {currency}',
       'hero.1':          'Flip the cards',
