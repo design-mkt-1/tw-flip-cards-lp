@@ -47,7 +47,14 @@
     },
 
     /* Destinations for the links that are deliberately left unwired.
-       Empty means the link stays href="#" and does nothing. */
+       Empty means the anchor gets NO href at all — it is not a tab stop, is
+       not announced as a link, and cannot be clicked, which is the honest
+       state of a seam nobody has filled in. It used to stay href="#", which
+       offers a control that does nothing.
+
+       termsUrl and privacyUrl block go-live: the form collects an 18+
+       consent, and consent text with no documents behind it is a compliance
+       problem, not a cosmetic one. */
     termsUrl:   '',
     privacyUrl: '',
     loginUrl:   '',
@@ -849,7 +856,13 @@
     for (var i = 0; i < map.length; i++) {
       var el = $(map[i][0]);
       var url = CONFIG[map[i][1]];
-      if (el && url) { el.href = url; el.rel = 'noopener'; }
+      if (!el) continue;
+      /* Set or REMOVE, never leave what the markup had. The four anchors ship
+         with no href, so the else branch is a no-op today — it is here so the
+         rule lives in one place and cannot drift from the HTML the way
+         href="#" did across three files. */
+      if (url) { el.setAttribute('href', url); el.rel = 'noopener'; }
+      else { el.removeAttribute('href'); }
     }
   }
 

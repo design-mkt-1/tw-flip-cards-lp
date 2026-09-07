@@ -2,3 +2,10 @@ Thumbs.db
 .DS_Store
 *.log
 __pycache__/
+
+# raw/fonts/ is a CACHE, not a source: tools/fonts.py downloads each Google
+# subset it cuts from and stores it here (tools/fonts.py:160), so a missing
+# file is one command away. raw/img/ stays tracked on purpose — its Figma
+# links have expired (tools/optimize.py:11) and icon-eye.svg was repaired by
+# hand there, so those bytes are the only copy.
+raw/fonts/

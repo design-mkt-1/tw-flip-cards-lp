@@ -1273,8 +1273,12 @@ body {
 }
 
 .fc-consent[data-invalid] .fc-consent__box { border-color: var(--fc-err); }
-.fc-consent a { color: var(--fc-link); font-weight: 600; text-decoration: none; }
-.fc-consent a:hover { text-decoration: underline; }
+/* [href] only. Until termsUrl and privacyUrl are set these anchors carry no
+   href, so they are not links and must not advertise themselves as ones —
+   they read as the label text they sit inside. Same rule for the sign-in
+   link below. */
+.fc-consent a[href] { color: var(--fc-link); font-weight: 600; text-decoration: none; }
+.fc-consent a[href]:hover { text-decoration: underline; }
 
 /* --- submit -------------------------------------------------------------- */
 
@@ -1304,8 +1308,8 @@ body {
 .fc-submit:focus-visible { outline: 2px solid var(--fc-navy); outline-offset: 3px; }
 
 .fc-signin { font-size: 14px; font-weight: 500; color: var(--fc-muted); }
-.fc-signin a { color: var(--fc-orange-deep); font-weight: 700; text-decoration: none; }
-.fc-signin a:hover { text-decoration: underline; }
+.fc-signin a[href] { color: var(--fc-orange-deep); font-weight: 700; text-decoration: none; }
+.fc-signin a[href]:hover { text-decoration: underline; }
 
 /* --- the confirmation screen -------------------------------------------- */
 

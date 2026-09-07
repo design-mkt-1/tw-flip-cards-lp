@@ -64,9 +64,15 @@ Everything in rows 1 to 3 sits inside one commented block at the top of
 Until row 1 is done the form sends nothing at all: it validates, then writes
 the payload to the browser console and stops. There is no error and no
 message — to a visitor it looks like a completed registration that quietly
-went nowhere. Until row 3 is done, Terms and Privacy are `href="#"` and go
-nowhere, which on a page that collects a date-of-birth consent is a
-compliance problem, not a cosmetic one.
+went nowhere. Until row 3 is done, the Terms and Privacy anchors carry **no
+`href` at all** — they are plain text inside the consent label, not links: no
+tab stop, nothing announced, nothing to click. That is the honest state of an
+unfilled seam, but it is not the finished state. A page that collects an 18+
+consent needs the two documents behind it, which is a compliance problem, not
+a cosmetic one.
+
+They used to ship as `href="#"`, which is worse than either: a control that
+takes focus, is announced as a link and does nothing. Fixed on 2026-09-07.
 
 Rows 2, 4, 5, 6 and 7 all have working defaults and can follow later.
 
