@@ -15,6 +15,19 @@ html, body {
   text-size-adjust: 100%;
 }
 
+/* The family, once, on the element everything inherits from.
+
+   Without this line the page has no font at all and anything that does not
+   name one renders in the browser's default serif. Every control in
+   css/shell.css and every field in css/form.css sets `font-family: var(--font)`
+   itself, so the header and the card looked right and hid it -- but the
+   footer's two lines and the <noscript> paragraph never did, and the shared
+   footer shipped in Times New Roman. Nothing failed: tools/fonts.py checks
+   that a glyph exists in a shipped face, not which face draws it, and
+   tools/smoke.py measures geometry. It was found by putting the three
+   landings' footers side by side. */
+body { font-family: var(--font); }
+
 img, svg { display: block; max-width: 100%; }
 
 /* `* { padding: 0 }` above removes the indent but NOT the marker, and a
