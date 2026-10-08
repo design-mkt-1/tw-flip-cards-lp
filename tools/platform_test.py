@@ -22,6 +22,11 @@ It walks the scenarios a visitor can actually hit:
                      landing_id or the rest
   production config  no config.json -> demo path; a config.json -> used
   the card           the phone tab is gone, the links come from the landing
+  analytics          GA, Yandex and GTM load from the landing response, as IT's
+                     LP does: valid IDs load, invalid ones are skipped, none
+                     loads nothing, an inactive landing still loads them, demo
+                     loads nothing, and the console shows no CSP refusal
+  badge              the reCAPTCHA badge is hidden, as IT's LP hides it
 """
 
 from functools import partial
@@ -295,8 +300,8 @@ def main():
             r.close()
 
             # ── production: config.json is fetched from the site root ──
-            def prod(config):
-                r = Run(browser, base)
+            def prod(config, **state):
+                r = Run(browser, base, **state)
 
                 def route(rt):
                     u = urlparse(rt.request.url)
@@ -325,6 +330,89 @@ def main():
             r.page.wait_for_function(SSO_DONE, timeout=6000)
             check('production, config.json present: its id is the landing_id',
                   r.state['registered'] and r.state['registered'][0].get('landing_id') == 42)
+            r.close()
+
+            # ── analytics, as IT's LP loads them from the landing response ──
+            GTAG_URL = 'https://www.googletagmanager.com/gtag/js?id=G-ABC123'
+            YM_URL = 'https://mc.yandex.ru/metrika/tag.js'
+            GTM_URL = 'https://www.googletagmanager.com/gtm.js?id=GTM-ABC123'
+            GOOD = {'analytics_google': 'G-ABC123', 'analytics_yandex': 12345678, 'gtm_tag': 'GTM-ABC123'}
+
+            r = Run(browser, base, **GOOD).open()
+            r.settle(600)
+            tags = r.page.evaluate("""() => ({
+                gtagConfig: (window.dataLayer || []).some(e => e && e[0] === 'config' && e[1] === 'G-ABC123'),
+                gtmStart: (window.dataLayer || []).some(e => e && e.event === 'gtm.js' && 'gtm.start' in e),
+                ymInit: ((window.ym && window.ym.a) || []).some(a => a[0] === 12345678 && a[1] === 'init'),
+                scripts: Array.from(document.querySelectorAll('script[src]')).map(s => s.src),
+            })""")
+            requested = r.state['analytics_requests']
+            check('analytics, valid IDs: gtag, tag.js and gtm.js are loaded',
+                  GTAG_URL in requested and YM_URL in requested and GTM_URL in requested
+                  and GTAG_URL in tags['scripts'] and YM_URL in tags['scripts'] and GTM_URL in tags['scripts'],
+                  str(requested))
+            check('analytics, valid IDs: dataLayer has the gtag config and the gtm.start event',
+                  tags['gtagConfig'] and tags['gtmStart'], str(tags))
+            check('analytics, valid IDs: the ym queue has the init call', tags['ymInit'], str(tags))
+            csp = [e for e in r.errors if 'Content Security Policy' in e or 'Refused to' in e]
+            check('analytics, valid IDs: no CSP refusal, nothing leaked, console clean',
+                  not csp and not r.state['leaks'] and not r.errors, str(csp + r.state['leaks'] + r.errors))
+            r.close()
+
+            r = Run(browser, base, analytics_google='G-x"><script>', analytics_yandex='12a', gtm_tag='GTM-abc')
+            warns = []
+            r.page.on('console', lambda m: warns.append(m.text) if m.type == 'warning' else None)
+            r.open()
+            r.settle(600)
+            bad = r.page.evaluate("""() => ({
+                scripts: Array.from(document.querySelectorAll('script[src]')).map(s => s.src),
+                ym: typeof window.ym, gtag: typeof window.gtag,
+            })""")
+            injected = [x for x in bad['scripts'] if 'googletagmanager' in x or 'mc.yandex' in x or 'G-x' in x]
+            check('analytics, invalid IDs: no script is injected for any of them',
+                  not injected and not r.state['analytics_requests'] and bad['ym'] == 'undefined'
+                  and bad['gtag'] == 'undefined', str(injected + r.state['analytics_requests']))
+            check('analytics, invalid IDs: each one is skipped with a console warning',
+                  sum('skipped an invalid' in w for w in warns) == 3, str(warns))
+            r.close()
+
+            r = Run(browser, base).open()
+            r.settle(600)
+            none = r.page.evaluate("""() => ({
+                gtag: typeof window.gtag, ym: typeof window.ym, dataLayer: typeof window.dataLayer,
+            })""")
+            check('analytics, no IDs: nothing is injected',
+                  not r.state['analytics_requests'] and none == {'gtag': 'undefined', 'ym': 'undefined', 'dataLayer': 'undefined'},
+                  str(none) + str(r.state['analytics_requests']))
+            r.close()
+
+            r = Run(browser, base, active=False, **GOOD).open()
+            r.page.wait_for_selector('#pl-off[open]', timeout=4000)
+            r.settle(300)
+            requested = r.state['analytics_requests']
+            check('analytics, inactive landing: the tags are injected anyway',
+                  GTAG_URL in requested and YM_URL in requested and GTM_URL in requested, str(requested))
+            r.close()
+
+            r = prod(None, **GOOD)
+            r.fill_and_submit()
+            r.page.wait_for_selector('[data-step="done"]:not([hidden])', timeout=4000)
+            check('analytics, demo mode (no config.json): nothing is injected',
+                  not r.state['analytics_requests'], str(r.state['analytics_requests']))
+            r.close()
+
+            # ── the reCAPTCHA badge is hidden, as IT's LP hides it ──
+            r = Run(browser, base).open()
+            r.settle()
+            badge = r.page.evaluate("""() => {
+                const b = document.createElement('div');
+                b.className = 'grecaptcha-badge';
+                document.body.appendChild(b);
+                const cs = getComputedStyle(b);
+                return [cs.opacity, cs.pointerEvents];
+            }""")
+            check('badge: .grecaptcha-badge is opacity 0 and takes no pointer events',
+                  badge == ['0', 'none'], str(badge))
             r.close()
         finally:
             browser.close()

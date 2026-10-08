@@ -74,7 +74,7 @@ jobs:
           python3 tools/smoke.py
 
       # The IT platform connection, against a stub: not one real request goes to
-      # jack-pot.tech, ipify or Google. Reuses the Chromium installed above.
+      # jack-pot.tech, ipify, Google or Yandex. Reuses the Chromium installed above.
       - name: The registration must follow the platform's flow, in every language
         run: python3 tools/platform_test.py
 

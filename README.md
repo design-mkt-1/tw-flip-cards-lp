@@ -20,7 +20,8 @@ python tools/platform_test.py     # the IT platform connection, against a stub
 
 `platform_test.py` plays the registration against a **stubbed** platform —
 inactive landing, success and the SSO hand-off, email taken, reCAPTCHA failure,
-network failure — in all three languages. `smoke.py` uses the same stub
+network failure, and the analytics tags (GA, Yandex, GTM), in all three
+languages. `smoke.py` uses the same stub
 (`tools/platform_stub.py`), because the page asks the platform for its landing
 on every load and that must never be a real request from CI or a laptop.
 
@@ -175,11 +176,17 @@ the password the visitor typed is never put back on screen.
 
 ## 3. What is intentionally not wired
 
-- **Network requests are only the platform's:** `config.json`, the landing
-  and registration APIs, `api.ipify.org`, and Google reCAPTCHA. The ipify
-  `clientIp` and the hidden reCAPTCHA badge both follow IT's LP. No analytics,
-  no tag manager, no pixels unless `analytics.*` is set, and no cookies of
-  ours (reCAPTCHA sets its own).
+- **Network requests are only the platform's, plus the analytics the landing
+  names:** `config.json`, the landing and registration APIs, `api.ipify.org`,
+  Google reCAPTCHA, and the GA, GTM and Yandex tags (see below). The ipify
+  `clientIp` and the hidden reCAPTCHA badge both follow IT's LP.
+- **Analytics load from the landing response, as in IT's LP.** GA, Yandex
+  Metrika and GTM IDs come from `GET landing`, and `js/platform.js` injects
+  them (`injectAnalytics`). Invalid IDs are skipped with a console warning.
+  Known limit: GTM loads whatever tags IT's container holds, and those may
+  need more CSP domains. Only the console on the first real test shows which.
+  Demo mode (no `config.json`) loads none.
+- **No cookies of ours** (reCAPTCHA and the analytics tags set their own).
 - **No password policy** beyond a minimum length (`form.passwordMin` in
   `campaign.js`, currently 8). Your platform's real rules will differ, so none
   were invented.

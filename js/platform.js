@@ -95,6 +95,7 @@
   var landingP = null;
   var recaptchaP = null;
   var landing = null;      // { data, config, domain } once active
+  var analyticsOn = false; // injectAnalytics runs once, even if the landing is retried
   var offShown = false;
   var busy = false;
 
@@ -167,6 +168,7 @@
       }).then(function (res) {
         var d = res && res.data;
         if (!d) throw new Error('landing: no data in the response');
+        if (!analyticsOn) { analyticsOn = true; injectAnalytics(d); }   // before the active check, as IT does
         if (!d.active) { showOff(); return 'off'; }
         if (!d.recaptcha_key) throw new Error('landing: no recaptcha_key');
 
@@ -185,6 +187,68 @@
       landingP = null;                // the next submit tries again
     });
     return landingP;
+  }
+
+  /* ── analytics, as IT's LP does it (their _js/analytics.js) ─
+     IT pastes these into inline <script> text. Our CSP has no 'unsafe-inline',
+     so that text would be blocked silently. Here the functions live in this
+     file and only <script src> elements are appended. The IDs are the only
+     thing that reaches code, so each one is checked before use. */
+
+  var ID_PATTERN = {
+    google: /^(G-[A-Z0-9]+|UA-\d+-\d+)$/,
+    yandex: /^\d+$/,
+    gtm:    /^GTM-[A-Z0-9]+$/
+  };
+
+  /* The ID as a string when it is valid for its kind, otherwise null. */
+  function checkId(kind, id) {
+    if (id === undefined || id === null || id === '') return null;
+    var s = String(id);
+    if (ID_PATTERN[kind].test(s)) return s;
+    console.warn('[platform] skipped an invalid ' + kind + ' analytics ID');
+    return null;
+  }
+
+  function appendScript(src) {
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = src;
+    document.head.appendChild(s);
+  }
+
+  function injectAnalytics(d) {
+    try {
+      var ga = checkId('google', d.analytics_google);
+      if (ga) {
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', ga);
+        appendScript('https://www.googletagmanager.com/gtag/js?id=' + ga);
+        console.log('Google Analytics (' + ga + ') added');
+      }
+
+      var ym_id = checkId('yandex', d.analytics_yandex);
+      if (ym_id) {
+        /* Yandex's own queue stub: calls made before tag.js loads are kept in ym.a. */
+        window.ym = window.ym || function () { (window.ym.a = window.ym.a || []).push(arguments); };
+        window.ym.l = 1 * new Date();
+        appendScript('https://mc.yandex.ru/metrika/tag.js');
+        window.ym(Number(ym_id), 'init', { clickmap: true, trackLinks: true, accurateTrackBounce: true });
+        console.log('Yandex Metrika (' + ym_id + ') added');
+      }
+
+      var gtm = checkId('gtm', d.gtm_tag);
+      if (gtm) {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        appendScript('https://www.googletagmanager.com/gtm.js?id=' + gtm);
+        console.log('Google Tag Manager (' + gtm + ') added');
+      }
+    } catch (e) {
+      console.error('[platform] analytics failed:', e && e.message);
+    }
   }
 
   /* ── the "unavailable" card ───────────────────────────────── */

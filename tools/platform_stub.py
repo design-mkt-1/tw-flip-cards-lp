@@ -13,6 +13,14 @@ import json
 
 API = 'https://api2-land-dev.jack-pot.tech'
 CASINO = 'https://casino.stub.test'
+# The analytics hosts js/platform.js loads from the landing response. They are
+# answered with an empty script, so nothing reaches Google or Yandex.
+ANALYTICS = (
+    'https://www.googletagmanager.com/',
+    'https://www.google-analytics.com/',
+    'https://mc.yandex.ru/',
+    'https://mc.yandex.com/',
+)
 CORS = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': '*',
@@ -42,6 +50,10 @@ def new_state(**over):
         'sso': [],            # {url, body} of every POST to the casino
         'landing_gets': [],   # headers of every GET landing
         'leaks': [],          # anything else that left the page
+        'analytics_google': None,   # IDs the landing response carries; None = absent
+        'analytics_yandex': None,
+        'gtm_tag': None,
+        'analytics_requests': [],   # every URL answered by the analytics stub
     }
     state.update(over)
     return state
@@ -58,6 +70,9 @@ def landing_json(state):
         'policy': CASINO + '/uk/privacy',
         'login': CASINO + '/uk/login',
         'redirect_link': 'lobby',
+        'analytics_google': state['analytics_google'],
+        'analytics_yandex': state['analytics_yandex'],
+        'gtm_tag': state['gtm_tag'],
     }}
 
 
@@ -105,6 +120,10 @@ def install(context, state, local_prefixes):
                                  'method': req.method})
             return route.fulfill(status=200, content_type='text/html',
                                  body='<!doctype html><title>casino stub</title>')
+
+        if any(url.startswith(p) for p in ANALYTICS):
+            state['analytics_requests'].append(url)
+            return route.fulfill(status=200, content_type='application/javascript', body='')
 
         state['leaks'].append('%s %s' % (req.method, url))
         return route.abort()

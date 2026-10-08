@@ -213,10 +213,14 @@ That is how an affiliate click id survives the page: the network puts
 with the same id attached. If your redirect drops these, the attribution is
 lost here and nowhere else.
 
-`analytics.gtmId` / `analytics.metaPixelId` are empty. Your landing injects
-Google / Yandex / GTM from the landing API response; this page does NOT: tell
-us if that is wanted. Setting either id here also needs the CSP `<meta>` in
-index.html widened for it — a meta policy cannot be written from JavaScript.
+GA, Yandex Metrika and GTM load from the landing API response, as in your
+landing: `js/platform.js` injects them, and the CSP `<meta>` in index.html
+already names their domains. Invalid IDs are skipped with a console warning.
+Known limit: GTM loads whatever tags your container holds, and those may need
+more CSP domains. Only the console on the first real test shows which.
+`analytics.gtmId` / `analytics.metaPixelId` in campaign.js are still read by
+the shared template's `js/shell.js`, so they are a second, separate GTM and
+Meta Pixel source. Leave them empty unless you want that.
 
 ## 5. The offer
 
