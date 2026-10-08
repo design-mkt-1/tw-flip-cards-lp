@@ -176,7 +176,8 @@ the password the visitor typed is never put back on screen.
 ## 3. What is intentionally not wired
 
 - **Network requests are only the platform's:** `config.json`, the landing
-  and registration APIs, `api.ipify.org`, and Google reCAPTCHA. No analytics,
+  and registration APIs, `api.ipify.org`, and Google reCAPTCHA. The ipify
+  `clientIp` and the hidden reCAPTCHA badge both follow IT's LP. No analytics,
   no tag manager, no pixels unless `analytics.*` is set, and no cookies of
   ours (reCAPTCHA sets its own).
 - **No password policy** beyond a minimum length (`form.passwordMin` in

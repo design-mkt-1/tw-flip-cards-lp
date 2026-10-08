@@ -185,15 +185,13 @@ confirmation screen. Check the console on the first deploy.
      landing sends `en` / `de`);
    - the casino site has `/uk/` and `/ru/` routes for the redirect, and what
      `redirect_link` should be;
-   - whether you want `clientIp` from `api.ipify.org` (a third party sees the
-     visitor's IP) or will read it server-side from the request — if the
-     latter, say so and it is deleted;
    - whether the registration error texts are stable English strings: we match
      "already registered" and "recaptcha" loosely, anything else is generic;
    - that `status.json` in your zip is read by your infrastructure, not by the
      page: nothing here references it.
-6. **What the visitor sees after reCAPTCHA is shown**: the v3 badge is left at
-   its default (bottom right), as in your landing.
+6. **The reCAPTCHA v3 badge is hidden** (`.grecaptcha-badge` in `css/styles.css`),
+   as your landing does it. The `clientIp` from `api.ipify.org` is sent too, as
+   your landing does it. Both follow your LP.
 
 The password is in the registration body, so `email_registration` must be your
 own TLS endpoint and nowhere else.
