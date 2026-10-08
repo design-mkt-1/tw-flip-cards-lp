@@ -914,3 +914,28 @@ body {
   /* The footer's own forced-colors behaviour travels with it, in
      css/shell.css. Nothing of this landing's is left to raise here. */
 }
+
+
+/* ══ the IT platform (js/platform.js) ═════════════════════════
+   Two things the template's card has no state for: a submit that is waiting on
+   the network, and the "page unavailable" card. Both use the template's own
+   tokens; neither touches css/form.css. */
+
+/* A disabled submit must look disabled AND stop answering to hover and press,
+   or the visitor taps it again believing nothing happened. */
+.tw-cta:disabled {
+  opacity: .6;
+  cursor: progress;
+  filter: none;
+  transform: none;
+}
+
+.pl-off .tw-card { gap: 16px; }
+.pl-off .tw-promo__logo { width: 120px; height: auto; }
+
+.pl-off__mail {
+  color: var(--accent-on-light);
+  font-size: 14px;
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+}

@@ -89,13 +89,42 @@ window.TW_CAMPAIGN = {
      own TLS endpoint and nowhere else. */
   form: {
     endpoint:     '',
-    onRegister:   null,
-    hiddenFields: { landing_id: 'tw-flip-cards' },
+    /* js/platform.js owns the registration: config, landing, reCAPTCHA, the
+       POST and the SSO redirect. It overrides `endpoint`, which stays empty. */
+    onRegister:   function (payload) { return window.TWPlatform.register(payload); },
+    /* landing_id is NOT here any more: the platform's numeric id comes from
+       config.json, and a string of ours would only compete with it. Anything
+       put here is copied onto the request body BEFORE the platform's own
+       fields, so it can add a field but never overwrite one. */
+    hiddenFields: {},
     demoDone:     true,
     dialCode:     '+380',
     dialFlag:     'assets/img/icons/flag-ua.svg',
     phoneDigits:  9,
     passwordMin:  8
+  },
+
+  /* ── The IT platform (js/platform.js) ─────────────────────────
+     In production the page reads `configUrl` from its own root:
+       { "id": <number>, "email_registration": "<url>", "landing": "<url>" }
+     Without that file the page is NOT connected: the form walks the demo
+     confirmation screen and says so in the console.
+
+     `dev` is IT's own TEMP_CONFIG, copied from their landing
+     (_js/enums/enums.js) so this page can be tried before a real id exists.
+     It is used ONLY on localhost, 127.0.0.1 or an origin starting with
+     https://land-crm. TEMP: id 8 is IT's landing, not ours; replace it, or
+     delete `dev`, once IT issues the real landing_id.
+
+     supportEmail is shown on the "unavailable" card; IT hardcodes it. */
+  platform: {
+    configUrl:    'config.json',
+    supportEmail: 'support@jack-pot.com',
+    dev: {
+      id: 8,
+      email_registration: 'https://api2-land-dev.jack-pot.tech/api/jp/registration/email',
+      landing:            'https://api2-land-dev.jack-pot.tech/api/jp/landing/8'
+    }
   },
 
   /* ── Languages ────────────────────────────────────────────────
@@ -168,6 +197,10 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни картки',
       'hero.2':          'забери свій бонус!',
       'game.label':      'Переверніть три картки та заберіть вітальний бонус',
+      'pl.off.title':   'Сторінка тимчасово недоступна',
+      'pl.off.text':    'Реєстрація зараз закрита. Спробуйте пізніше або напишіть нам:',
+      'err.exists':     'Цей email уже зареєстровано. Увійдіть в акаунт',
+      'err.recaptcha':  'Не вдалося пройти перевірку безпеки. Спробуйте ще раз',
       'cta.claim':       'Забрати бонус'
     },
     ru: {
@@ -177,6 +210,10 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни карты',
       'hero.2':          'забери свой бонус!',
       'game.label':      'Переверните три карты и заберите приветственный бонус',
+      'pl.off.title':   'Страница временно недоступна',
+      'pl.off.text':    'Регистрация сейчас закрыта. Попробуйте позже или напишите нам:',
+      'err.exists':     'Этот email уже зарегистрирован. Войдите в аккаунт',
+      'err.recaptcha':  'Не удалось пройти проверку безопасности. Попробуйте ещё раз',
       'cta.claim':       'Забрать бонус'
     },
     en: {
@@ -186,6 +223,10 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Flip the cards',
       'hero.2':          'claim your bonus!',
       'game.label':      'Turn three cards and claim your welcome bonus',
+      'pl.off.title':   'This page is temporarily unavailable',
+      'pl.off.text':    'Registration is closed right now. Please try again later or write to us:',
+      'err.exists':     'This email is already registered. Please log in',
+      'err.recaptcha':  'The security check failed. Please try again',
       'cta.claim':       'Claim bonus'
     }
   }

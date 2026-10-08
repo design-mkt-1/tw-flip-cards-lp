@@ -73,6 +73,11 @@ jobs:
           python3 -m playwright install --with-deps chromium
           python3 tools/smoke.py
 
+      # The IT platform connection, against a stub: not one real request goes to
+      # jack-pot.tech, ipify or Google. Reuses the Chromium installed above.
+      - name: The registration must follow the platform's flow, in every language
+        run: python3 tools/platform_test.py
+
   build:
     needs: [fonts, smoke]
     # A pull request gets the checks above and stops there. Only main is built

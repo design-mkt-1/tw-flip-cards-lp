@@ -9,13 +9,20 @@ Open it with any static server:
 python -m http.server 8000     # then http://127.0.0.1:8000/
 ```
 
-Two guards run on every pull request, and both run by hand too. Neither is a
+Three guards run on every pull request, and all run by hand too. None is a
 build step — the published site is these files:
 
 ```
-python tools/fonts.py --check   # every character the page renders is in the fonts
-python tools/smoke.py           # the pages, in a real browser (needs Playwright)
+python tools/fonts.py --check     # every character the page renders is in the fonts
+python tools/smoke.py             # the pages, in a real browser (needs Playwright)
+python tools/platform_test.py     # the IT platform connection, against a stub
 ```
+
+`platform_test.py` plays the registration against a **stubbed** platform —
+inactive landing, success and the SSO hand-off, email taken, reCAPTCHA failure,
+network failure — in all three languages. `smoke.py` uses the same stub
+(`tools/platform_stub.py`), because the page asks the platform for its landing
+on every load and that must never be a real request from CI or a laptop.
 
 `smoke.py` serves the project on a loopback port and loads the page once per
 language at each of two viewports, asserting what no text check can see: the
@@ -75,27 +82,28 @@ and pulled down. `js/flip.js` is the game, and `campaign.js` is the campaign.
 
 | # | What | Where |
 |---|------|-------|
-| 1 | Where the form submits | `form.endpoint` in `campaign.js`, **or** `form.onRegister` |
-| 2 | Extra values on the submission | `form.hiddenFields` — affiliate id, campaign, CSRF token |
-| 3 | Terms / Privacy / Login links | `links.terms`, `links.privacy`, `links.login` |
-| 4 | Phone country | `form.dialCode`, `form.dialFlag`, `form.phoneDigits` |
+| 1 | The platform: registration, landing, reCAPTCHA, login redirect | `js/platform.js`, `platform` in `campaign.js`, and a `config.json` on the server — section 2 |
+| 2 | Extra values on the submission | `form.hiddenFields` — copied onto the request body, never over a real field |
+| 3 | Terms / Privacy / Login links | come from the platform's landing API (`rules`, `policy`, `login`); `links.*` is only the fallback |
+| 4 | ~~Phone country~~ | unused: the phone tab is removed, the API is email-only |
 | 5 | Where the confirmation screen's button goes | `links.cta` |
 | 6 | What the platform is told the bonus was | `offer.code` — travels as `bonus` on the payload |
 | 7 | The header logo's destination | `links.home` |
 | 8 | Tracking that rides through to the operator | `params` and `passthrough` |
 
-**Rows 1 and 3 block go-live. The rest do not.**
+**Row 1 blocks go-live.** Until a `config.json` exists next to `index.html`
+the page is **not connected**: the form validates, writes a warning to the
+browser console and walks the demo confirmation screen — to a visitor it looks
+like a completed registration that quietly went nowhere. That demo is
+deliberate (the GitHub Pages preview needs it) and it is the first thing to
+check on a fresh deploy.
 
-Until row 1 is done the form sends nothing at all: it validates, then writes
-the payload to the browser console and walks the confirmation screen anyway —
-to a visitor it looks like a completed registration that quietly went nowhere.
-Until row 3 is done, the Terms and Privacy anchors carry **no `href` at all**:
-they are plain text inside the consent label, which is the honest state of an
-unfilled seam but not the finished one. A page that collects an 18+ consent
-needs the two documents behind it, and that is a compliance problem rather
-than a cosmetic one.
+Row 3 is no longer a separate task: once the landing API answers, the Terms and
+Privacy links come from it. They are still a compliance matter — if the API
+omits `rules` or `policy`, those two anchors have no `href` and the consent
+sentence has no documents behind it.
 
-Rows 2 and 4 to 8 all have working defaults and can follow later.
+Rows 2 and 5 to 8 all have working defaults and can follow later.
 
 `form.dialFlag` takes either an emoji or a path to an 18 × 18 image, and it
 ships as an image because Windows has no flag glyphs: Segoe UI Emoji draws 🇺🇦
@@ -103,88 +111,83 @@ as the bare letters "UA".
 
 ---
 
-## 2. Wiring the form
+## 2. The platform connection
 
-> **There is a Content-Security-Policy `<meta>` in the head of `index.html`.**
-> The card posts JSON with `fetch`, and `default-src 'self'` covers that — so
-> an endpoint on **another origin** needs that origin added to `connect-src` in
-> the policy. A CSP refusal appears **only in the browser console**: the submit
-> looks like it simply did nothing.
+`js/platform.js` is this landing's own file (not the template's). It follows
+IT's reference landing step for step, so their deploy drops in. **The form is
+email + password only** — the phone tab is removed, because the API is
+`registration/email`.
 
-**A. An endpoint.** Set it in `campaign.js` and the card POSTs JSON to it.
+1. **Config.** On `localhost`, `127.0.0.1` or an origin starting with
+   `https://land-crm` the page uses `platform.dev` in `campaign.js`, which is
+   IT's own `TEMP_CONFIG` (landing id **8**, `api2-land-dev.jack-pot.tech`).
+   **Everywhere else** it fetches `config.json` from the site root:
+   `{ "id": <number>, "email_registration": "<url>", "landing": "<url>" }`.
+2. **Landing.** `GET config.landing` on every load. If `data.active` is false
+   the page shows a "temporarily unavailable" card (mailto
+   `platform.supportEmail`) in the visitor's language and nothing else works.
+   Otherwise `data.rules` / `policy` / `login` become the Terms, Privacy and
+   Login links (with the page's query string appended), and reCAPTCHA v3 is
+   loaded with `data.recaptcha_key`.
+3. **Submit.** `grecaptcha.execute(key, {action: 'register'})`, the visitor's IP
+   from `api.ipify.org` (3 s ceiling, `""` on failure), then
+   `POST config.email_registration` with
+   `email, password, landing_id, language, currency, country, promocode,
+   receivePromos: true, clientIp, g-recaptcha-response`. `language` is `uk`,
+   `ru` or `en`. The URL parameters in `campaign.js § passthrough` and
+   `form.hiddenFields` go **first**, so they can add fields and can never
+   overwrite one of those.
+4. **Success.** `response.data.accessToken` is POSTed (hidden form,
+   `application/x-www-form-urlencoded`) to `<casino>/api/welcome` as `tmpToken`,
+   with `redirect=<casino>/<lang>/<redirect_link>?<page query>`; `<casino>` is
+   the host of `data.rules`. The player arrives logged in. The template's
+   confirmation screen — which shows a login and a password — is **never shown**.
+5. **Errors.** `{ "errors": ["…"] }` is read: "already registered" and
+   anything mentioning reCAPTCHA get their own message in UA / RU / EN
+   (`campaign.js § strings`: `err.exists`, `err.recaptcha`). Anything else,
+   including a network failure, is the template's generic "could not send".
+   While the request runs the submit button is disabled.
 
-```js
-form: { endpoint: 'https://api.example.com/signup', ... }
-```
+> **The Content-Security-Policy `<meta>` in `index.html` is written for this**
+> and names the origins one by one. Two things are open and **both fail
+> silently** (a CSP refusal appears only in the browser console):
+> the **production API origin** must be added to `connect-src` (only IT's dev
+> host is there, marked TEMP), and **`form-action 'self' https://<casino>`**
+> must be added for the SSO POST once IT names the casino domain. See the
+> comment above the `<meta>`.
 
-A response carrying `{ "login": "…", "password": "…" }` fills the confirmation
-screen. Any other JSON, or none, and the screen shows what the visitor typed.
-A non-2xx response, or a network failure, shows the card's own error line and
-leaves the visitor on the form.
+The password is in the registration body, so `config.email_registration` must
+be the operator's own TLS endpoint and nowhere else.
 
-**B. A function**, when the request needs more than that. It overrides
-`endpoint` and you own the request from the moment validation passes.
-
-```js
-form: {
-  onRegister: function (payload) {
-    // payload = { method, contact, email, phone, password, consent, lang,
-    //             bonus, landing_id, ...hiddenFields, ...params }
-    return fetch('/api/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); })
-      .then(function (d) { return { login: d.login, password: d.password }; });
-  }
-}
-```
-
-With neither set, nothing is sent: the payload goes to `console.info` and,
-because `form.demoDone` is true, the confirmation screen is walked anyway. The
-page is fully demoable before the platform exists — and it says so loudly in
-the console, so it cannot be mistaken for a working integration.
-
-**The `action=` route is gone.** This landing used to let the browser submit
-the form natively; the shared card does not have that route, because a native
-submit navigates away and the confirmation screen is the point of the design.
-Use `endpoint` — it is the same amount of work and one line.
+`form.endpoint` and `form.onRegister` in `campaign.js` are no longer the seam:
+`onRegister` calls `window.TWPlatform.register`, which overrides `endpoint`.
 
 ---
 
 ## 2a. The confirmation screen
 
-The card has a second panel: **Реєстрація успішна!**, the login and password
-your platform issued, a copy button on each, and a button to the site. The
-logo and the offer block stay; only the body under them swaps, so the card is
-never closed and reopened.
-
-It appears by itself when the request resolves. To drive it by hand:
-
-```js
-TW.showDone({ login: '+380 93 123 4567', password: 'a1B2c3D4' });
-```
-
-Both values are inserted with `textContent`, never as HTML. `links.cta` is the
-orange button's destination; left empty it carries no `href` and is inert.
-
-Copying uses `navigator.clipboard`, which needs a secure context. Over `https`
-it works; opened from `file://` it falls back to selecting the text so `Ctrl+C`
-still gets it.
+The template's second panel (**Реєстрація успішна!**, login and password, copy
+buttons) is **only reachable in demo mode** now — no `config.json`. With the
+platform connected, success is the SSO redirect and this panel never opens, so
+the password the visitor typed is never put back on screen.
 
 ---
 
 ## 3. What is intentionally not wired
 
-- **No network request of any kind.** No `fetch`, no `XMLHttpRequest`, no
-  analytics, no tag manager, no pixels, no cookies.
+- **Network requests are only the platform's:** `config.json`, the landing
+  and registration APIs, `api.ipify.org`, and Google reCAPTCHA. No analytics,
+  no tag manager, no pixels unless `analytics.*` is set, and no cookies of
+  ours (reCAPTCHA sets its own).
 - **No password policy** beyond a minimum length (`form.passwordMin` in
   `campaign.js`, currently 8). Your platform's real rules will differ, so none
   were invented.
-- **No CSRF token.** Add it through `form.hiddenFields`.
+- **No CSRF token.** `form.hiddenFields` would carry one onto the request body.
+- **No consent flag in the request.** IT's body has none and ours matches; the
+  tick-box is checked locally only.
 - **No consent or cookie banner.**
-- **No credentials are invented.** The confirmation screen shows whatever you
-  hand it and nothing else; with nothing wired it never opens.
+- **No credentials are invented or shown.** The platform logs the player in
+  through the SSO redirect.
 - **Game state is not persisted.** Reloading restarts the game. That is
   deliberate for a campaign page.
 - **Nobody can lose, and nobody turns more than three.** The board locks the

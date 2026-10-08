@@ -79,6 +79,9 @@ from pathlib import Path
 import sys
 import threading
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import platform_stub
+
 try:
     from playwright.sync_api import sync_playwright
 except ImportError:
@@ -354,6 +357,13 @@ def main():
         try:
             for name, width, height in VIEWPORTS:
                 context = browser.new_context(viewport={'width': width, 'height': height})
+                # js/platform.js asks the IT API for the landing on every load
+                # (127.0.0.1 counts as development). That must never be a real
+                # request, from CI or from a laptop: it is answered from here,
+                # and anything else that leaves the page is aborted and fails
+                # the run below.
+                stub = platform_stub.new_state()
+                platform_stub.install(context, stub, [base])
                 page = context.new_page()
 
                 # Attached once per context, cleared per page below, so a
@@ -377,6 +387,8 @@ def main():
                     except Skipped as why:
                         played = 'game not played (%s)' % why
                     bad.extend(errors)
+                    bad.extend('left the page: ' + u for u in stub['leaks'])
+                    stub['leaks'].clear()
                     label = '%s @ %s' % (where, name)
                     if bad:
                         failures += len(bad)

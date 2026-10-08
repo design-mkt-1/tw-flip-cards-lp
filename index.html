@@ -6,23 +6,37 @@
 <meta name="theme-color" content="#00002e">
 
 <!-- GitHub Pages cannot set response headers, so the policy ships as a meta.
-     The page references no external origin at all, and uses no data: URI, no
-     eval and no worker, which is why every directive below is 'self' or none.
+     It names exactly the origins js/platform.js talks to and nothing wider:
+
+       script-src   www.google.com/recaptcha/ and www.gstatic.com/recaptcha/ --
+                    reCAPTCHA v3 loads api.js from the first and its runtime
+                    from the second.
+       frame-src    www.google.com/recaptcha/ -- the invisible challenge frame.
+       connect-src  'self' (config.json), the platform API, api.ipify.org (the
+                    visitor IP the platform's body carries) and
+                    www.google.com/recaptcha/.
+
+     TEMP: api2-land-dev.jack-pot.tech is IT's development API, the one
+     campaign.js § platform.dev points at. The PRODUCTION API origin is not
+     known yet and MUST be added to connect-src before go-live, or every
+     submit fails in the browser with nothing on screen (README-IT section 3).
+
+     form-action is still absent, on purpose: the SSO hand-off POSTs to the
+     casino's domain, which comes from the API (data.rules) at runtime and is
+     not knowable here. Once IT names it, add `form-action 'self' https://<it>`
+     -- a wrong value would block the redirect silently.
 
      style-src carries 'unsafe-inline' for two real reasons, not laziness: the
      noscript fallback near the end of this head is an inline style block, and
-     js/flip.js sets style attributes — the stagger index on each winning card
+     js/flip.js sets style attributes -- the stagger index on each winning card
      and will-change on a card mid-flip. Without it the no-JS fallback and the
      reveal stagger both break, and they break SILENTLY: a CSP violation shows
      up in the console and nowhere else.
 
-     form-action is deliberately absent. It does not fall back to default-src,
-     so the form stays free to POST wherever IT wires it (README section 2).
-     Adding it here would break that wiring on the day it happens.
      frame-ancestors is absent because browsers ignore it in a meta policy;
      writing it here would only look like protection. -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; base-uri 'none'; object-src 'none'">
+      content="default-src 'self'; script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' https://api2-land-dev.jack-pot.tech https://api.ipify.org https://www.google.com/recaptcha/; frame-src https://www.google.com/recaptcha/; base-uri 'none'; object-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <!-- Static, because a crawler and a link preview read the head before any
@@ -152,6 +166,7 @@
 <script src="js/i18n.js" defer></script>
 <script src="js/form.js" defer></script>
 <script src="js/shell.js" defer></script>
+<script src="js/platform.js" defer></script>
 <script src="js/flip.js" defer></script>
 </body>
 </html>

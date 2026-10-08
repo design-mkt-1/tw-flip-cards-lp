@@ -56,8 +56,9 @@ README = """# tw-flip-cards — for whoever hosts this
 
 A static landing page: nine cards face down, the visitor turns three, and the
 third one opens the registration card. No build step, no server-side code, no
-runtime dependency, and as shipped not one third-party request. Upload the
-contents of this archive to any web server or object store.
+runtime dependency. It talks to YOUR platform's API (section 3) and to Google
+reCAPTCHA, and to nothing else. Upload the contents of this archive to any web
+server or object store, then do section 3.
 
 Everything is referenced with RELATIVE paths, so it runs from the root of a
 domain or from a subfolder without an edit.
@@ -86,9 +87,10 @@ anything you run — routing, an ad, a QR code — still points at `/ru.html` or
 `/en.html`, those two URLs are gone and will answer 404. `?lang=ru` and
 `?lang=en` on index.html are the replacements.
 
-## 1. campaign.js is the only file you edit
+## 1. campaign.js and config.json are what you touch
 
-It sits at the root of the archive and is one file of commented settings.
+`campaign.js` sits at the root of the archive and is one file of commented
+settings. `config.json` is the file YOU add next to it (section 3).
 
 **The registration card is not this landing's code.** It is shared with the
 other Top Win landings — `css/tokens.css`, `css/form.css`, `js/strings.js`,
@@ -111,44 +113,92 @@ no tab stop, nothing announced, nothing to click. **Do not write `"#"`** --
 that is a control which takes focus, is announced as a link and does nothing,
 and it is what these four shipped as until 2026-09-07.
 
-`terms` and `privacy` block go-live because the page collects an 18+ consent.
-Dead consent links on a gambling registration form are a compliance problem,
-not a cosmetic one.
+**These now come from your landing API** (`data.rules`, `data.policy`,
+`data.login`), with the page's query string appended. The values in
+`campaign.js` are only the fallback for a field the API leaves out.
+`terms` and `privacy` still matter: the page collects an 18+ consent, and dead
+consent links on a gambling registration form are a compliance problem, not a
+cosmetic one.
 
-## 3. The form
+## 3. The platform connection -- WHAT WE NEED FROM YOU
 
-`campaign.js` -> `form.endpoint`. Set it and the card POSTs JSON there; a
-response carrying `{{ "login": "...", "password": "..." }}` fills the
-confirmation screen. `form.onRegister(payload)` is the escape hatch for
-anything more involved: it returns a promise and overrides `endpoint`.
+`js/platform.js` is written against your own reference landing (the zip you
+sent), step for step. The form is **email + password only**: the phone tab is
+removed because the API is `registration/email`.
 
-The payload:
+How it works:
 
-    {{ method: 'email' | 'phone',
-      contact: the one that was filled in,
-      email, phone, password, consent,
-      lang: 'uk' | 'ru' | 'en',
-      bonus: '{bonus}',
-      landing_id: '{landing}',
-      ...form.hiddenFields, ...params }}
+1. `GET config.landing` on every load (`Content-Type` and `Accept:
+   application/json`). `data.active` false -> a "temporarily unavailable" card
+   with `support@jack-pot.com`, in UA / RU / EN, and nothing else works.
+   Otherwise the Terms / Privacy / Login links come from `rules` / `policy` /
+   `login`, and reCAPTCHA v3 loads with `data.recaptcha_key`.
+2. Submit: reCAPTCHA token (action `register`), the visitor's IP from
+   `api.ipify.org`, then `POST config.email_registration`:
 
-It carries the password, which means **`endpoint` must be your own TLS
-endpoint and nowhere else**. `form.hiddenFields` is copied onto every payload
-as-is — a CSRF token belongs there.
+       {{ email, password, landing_id, language, currency, country, promocode,
+         receivePromos: true, clientIp, "g-recaptcha-response",
+         ...URL params from the whitelist below }}
 
-Leave both empty and NOTHING IS SENT: the validated payload goes to the
-browser console and the confirmation screen is walked anyway, so the page is
-demoable before the platform exists. It says so in the console, loudly, so it
-cannot be mistaken for a working integration.
+   `language` is `uk`, `ru` or `en`. The URL params are spread FIRST, so a
+   parameter called `email` or `landing_id` cannot overwrite the real field.
+3. Success: `response.data.accessToken` is POSTed to `<casino>/api/welcome` as
+   `tmpToken`, with `redirect=<casino>/<lang>/<redirect_link>?<page query>`.
+   `<casino>` is the host of `data.rules`. The confirmation screen that shows a
+   login and a password is never shown.
+4. Errors: `{{ errors: [msg] }}`. "already registered" and anything mentioning
+   reCAPTCHA get their own translated message; everything else is the generic
+   "could not send".
 
-**There is no `action=` route.** An earlier version of this landing let the
-browser submit the form natively. The shared card does not: a native submit
-navigates away, and the confirmation screen is the point of the design.
+**Development.** On localhost, 127.0.0.1 or `https://land-crm...` it uses
+`campaign.js` -> `platform.dev`, which is YOUR `TEMP_CONFIG` copied verbatim
+(landing id 8, `api2-land-dev.jack-pot.tech`). Replace or delete it.
 
-**The Content-Security-Policy `<meta>` in the head of index.html.** The card
-posts with `fetch`, which `default-src 'self'` covers — so an endpoint on
-ANOTHER origin needs that origin added to `connect-src`. A CSP refusal appears
-only in the console: the submit looks like it did nothing.
+**Production.** The page fetches `config.json` from the site root:
+
+    {{ "id": <numeric landing_id>,
+      "email_registration": "https://<api host>/api/jp/registration/email",
+      "landing": "https://<api host>/api/jp/landing/<id>" }}
+
+**WITHOUT `config.json` THE PAGE IS NOT CONNECTED.** It still looks finished:
+the form validates, writes a warning to the browser console and shows the demo
+confirmation screen. Check the console on the first deploy.
+
+### What you have to supply or change
+
+1. **`config.json`**, with the real **`landing_id`** for this landing (the
+   zip's 8 is your own landing, not ours) and the **production API host**.
+2. **CORS** on the landing and registration endpoints for the domain this page
+   is served from: a `GET` carrying `Content-Type: application/json` (so a
+   preflight) and a JSON `POST`.
+3. **The reCAPTCHA v3 key** (`recaptcha_key` in the landing response) must be
+   registered for THIS page's domain with Google.
+4. **The Content-Security-Policy `<meta>` in `index.html`**, in two places. A
+   CSP refusal shows ONLY in the browser console; the visitor sees nothing:
+   - add the production API origin to `connect-src` (only your dev host is
+     there, marked TEMP);
+   - add `form-action 'self' https://<casino domain>` for the `/api/welcome`
+     POST. The directive is absent today because that domain comes from the
+     API at runtime and could not be written here.
+5. **Confirm, because we could not test against the real API:**
+   - the registration endpoint accepts `language: "uk"` and `"ru"` (your
+     landing sends `en` / `de`);
+   - the casino site has `/uk/` and `/ru/` routes for the redirect, and what
+     `redirect_link` should be;
+   - whether you want `clientIp` from `api.ipify.org` (a third party sees the
+     visitor's IP) or will read it server-side from the request — if the
+     latter, say so and it is deleted;
+   - whether the registration error texts are stable English strings: we match
+     "already registered" and "recaptcha" loosely, anything else is generic;
+   - that `status.json` in your zip is read by your infrastructure, not by the
+     page: nothing here references it.
+6. **What the visitor sees after reCAPTCHA is shown**: the v3 badge is left at
+   its default (bottom right), as in your landing.
+
+The password is in the registration body, so `email_registration` must be your
+own TLS endpoint and nowhere else.
+
+---
 
 ## 4. Tracking, and the affiliate click id
 
@@ -165,10 +215,10 @@ That is how an affiliate click id survives the page: the network puts
 with the same id attached. If your redirect drops these, the attribution is
 lost here and nowhere else.
 
-`analytics.gtmId` / `analytics.metaPixelId` are empty and with both empty the
-page makes no third-party request at all. Setting either also needs the CSP
-`<meta>` in index.html swapped for the analytics one — a meta policy cannot be
-written from JavaScript.
+`analytics.gtmId` / `analytics.metaPixelId` are empty. Your landing injects
+Google / Yandex / GTM from the landing API response; this page does NOT: tell
+us if that is wanted. Setting either id here also needs the CSP `<meta>` in
+index.html widened for it — a meta policy cannot be written from JavaScript.
 
 ## 5. The offer
 
