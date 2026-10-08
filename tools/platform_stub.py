@@ -12,7 +12,12 @@ a missing origin in it shows up as a console error exactly as it would live.
 import json
 
 API = 'https://api2-land-dev.jack-pot.tech'
+# The production API. The page reads the same paths from either host.
+PROD_API = 'https://api2-land-prod.top-win.promo'
+APIS = (API, PROD_API)
 CASINO = 'https://casino.stub.test'
+# The tracker mirror TopWin returns as redirectUrl. Its /api/welcome is answered like the casino's.
+MIRROR = 'https://mirror.example'
 # The analytics hosts js/platform.js loads from the landing response. They are
 # answered with an empty script, so nothing reaches Google or Yandex.
 ANALYTICS = (
@@ -43,6 +48,8 @@ def new_state(**over):
         'landing_delay': 0,
         'register_status': 200,
         'register_json': {'data': {'accessToken': 'TMP-TOKEN-123'}},
+        'redirect_url': None,  # set: the registration answer also carries data.redirectUrl
+        'casino_rules': True,  # False: the landing has no rules URL, so there is no casino domain
         'register_abort': False,
         'recaptcha_ok': True,
         'ipify_ok': True,
@@ -66,7 +73,7 @@ def landing_json(state):
         'country': 'UA',
         'currency': 'UAH',
         'promocode': 'PROMO-X',
-        'rules': CASINO + '/uk/rules',
+        'rules': CASINO + '/uk/rules' if state['casino_rules'] else '',
         'policy': CASINO + '/uk/privacy',
         'login': CASINO + '/uk/login',
         'redirect_link': 'lobby',
@@ -90,18 +97,21 @@ def install(context, state, local_prefixes):
         if req.method == 'OPTIONS':
             return route.fulfill(status=204, headers=CORS)
 
-        if url.startswith(API + '/api/jp/landing/'):
+        if any(url.startswith(a + '/api/jp/landing/') for a in APIS):
             state['landing_gets'].append(req.headers)
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body=json.dumps(landing_json(state)))
 
-        if url.startswith(API + '/api/jp/registration/email'):
+        if any(url.startswith(a + '/api/jp/registration/email') for a in APIS):
             if state['register_abort']:
                 return route.abort()
             state['registered'].append(json.loads(req.post_data or '{}'))
+            payload = state['register_json']
+            if state['redirect_url']:
+                payload = {'data': dict(payload['data'], redirectUrl=state['redirect_url'])}
             return route.fulfill(status=state['register_status'], headers=CORS,
                                  content_type='application/json',
-                                 body=json.dumps(state['register_json']))
+                                 body=json.dumps(payload))
 
         if url.startswith('https://www.google.com/recaptcha/api.js'):
             result = ('Promise.resolve("STUB-TOKEN:" + key + ":" + opts.action)' if state['recaptcha_ok']
@@ -115,7 +125,7 @@ def install(context, state, local_prefixes):
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body='{"ip":"203.0.113.7"}')
 
-        if url.startswith(CASINO + '/api/welcome'):
+        if url.startswith(CASINO + '/api/welcome') or url.startswith(MIRROR + '/api/welcome'):
             state['sso'].append({'url': url, 'body': req.post_data or '',
                                  'method': req.method})
             return route.fulfill(status=200, content_type='text/html',

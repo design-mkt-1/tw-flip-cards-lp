@@ -26,6 +26,10 @@ It walks the scenarios a visitor can actually hit:
                      LP does: valid IDs load, invalid ones are skipped, none
                      loads nothing, an inactive landing still loads them, demo
                      loads nothing, and the console shows no CSP refusal
+  redirectUrl        TopWin's redirectUrl: the hand-off goes to its mirror, with
+                     the page query; no redirectUrl and no casino domain -> the
+                     generic line and nothing posted
+  CSP                the production API is in connect-src
   badge              the reCAPTCHA badge is hidden, as IT's LP hides it
 """
 
@@ -34,6 +38,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import json
+import re
 import sys
 import threading
 
@@ -229,6 +234,35 @@ def main():
                   len(r.state['sso']) == 1 and not seen, str(seen))
             r.close()
 
+            # ── success with redirectUrl (TopWin): the hand-off goes to its mirror ──
+            r = Run(browser, base, redirect_url=stubmod.MIRROR + '/uk?modal=signIn').open('lang=ua&click_id=CLK1&sub1=S1')
+            r.settle()
+            r.fill_and_submit()
+            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            sso = r.state['sso']
+            fields = parse_qs(sso[0]['body']) if sso else {}
+            check('redirectUrl: one POST to <mirror>/api/welcome',
+                  len(sso) == 1 and sso[0]['method'] == 'POST'
+                  and sso[0]['url'] == stubmod.MIRROR + '/api/welcome', str(sso))
+            check('redirectUrl: tmpToken is the accessToken', fields.get('tmpToken') == ['TMP-TOKEN-123'], str(fields))
+            check('redirectUrl: redirect is the redirectUrl plus the page query',
+                  fields.get('redirect') == [stubmod.MIRROR + '/uk?modal=signIn&lang=ua&click_id=CLK1&sub1=S1'],
+                  str(fields.get('redirect')))
+            check('redirectUrl: only the stubbed origins were contacted, console clean',
+                  not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
+            r.close()
+
+            # No redirectUrl and no casino domain: nothing to hand off to.
+            r = Run(browser, base, casino_rules=False).open('lang=en')
+            r.settle()
+            r.fill_and_submit()
+            r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
+            check('no redirectUrl, no casino domain: the generic line',
+                  r.form_error() == MESSAGES['en']['network'], r.form_error())
+            check('no redirectUrl, no casino domain: nothing posted to any welcome',
+                  not r.state['sso'], str(r.state['sso']))
+            r.close()
+
             # ── errors, in every language ──
             for lang in ('ua', 'ru', 'en'):
                 r = Run(browser, base, register_status=400,
@@ -414,6 +448,12 @@ def main():
             check('badge: .grecaptcha-badge is opacity 0 and takes no pointer events',
                   badge == ['0', 'none'], str(badge))
             r.close()
+
+            # ── CSP: the production API is allowed in connect-src ──
+            html = (ROOT / 'index.html').read_text(encoding='utf-8')
+            connect = re.search(r"connect-src ('self'[^;]*);", html).group(1).split()
+            check('CSP: connect-src has the production API, right after self',
+                  connect[:2] == ["'self'", stubmod.PROD_API], str(connect))
         finally:
             browser.close()
             httpd.shutdown()

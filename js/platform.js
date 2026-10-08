@@ -20,11 +20,12 @@
                 Otherwise the Terms / Privacy / Login links come from the API
                 and reCAPTCHA v3 is loaded with the key the API gave us.
    3. submit.   reCAPTCHA token, visitor IP, then POST config.email_registration.
-   4. success.  response.data.accessToken goes to <casino>/api/welcome as a
-                hidden form POST (tmpToken + redirect), and the visitor lands on
-                the platform already logged in. The confirmation screen of the
-                template is never shown: it exists to display a login and a
-                password, and here there is nothing to display.
+   4. success.  response.data.accessToken and response.data.redirectUrl.
+                TopWin returns redirectUrl: the tracker mirror with modal=signIn.
+                That URL is POSTed to <mirror>/api/welcome as tmpToken + redirect.
+                The landing's redirect_link is not used for that hand-off.
+                Without redirectUrl, the older path remains: <rules host>/api/welcome
+                and /{lang}/{redirect_link}. The confirmation screen is never shown.
 
    ── What form.js does with what we return ────────────────────
    onRegister's result is awaited. Resolve -> showDone() with the credentials.
@@ -376,17 +377,29 @@
 
   /* A real form POST, because that is what /api/welcome takes and because the
      token must travel in a body, never in a URL that history and referrers
-     keep. tmpToken is a one-shot login ticket, not the password. */
-  function sso(token, lang) {
-    var d = landing.data;
-    var path = [lang, String(d.redirect_link || '').replace(/^\/+/, '')]
-      .filter(Boolean).join('/');
+     keep. tmpToken is a one-shot login ticket, not the password.
+     When the API returns redirectUrl, welcome is posted to that mirror and
+     redirect is the sign-in page. The CRM redirect_link is only the fallback. */
+  function sso(token, redirectUrl) {
+    var action, redirect;
+    if (redirectUrl) {
+      var mirror = new URL(redirectUrl);
+      action = mirror.origin + '/api/welcome';
+      redirect = withQuery(redirectUrl);
+    } else {
+      var d = landing.data;
+      var lang = window.TWI18n ? TWI18n.tag() : document.documentElement.lang;
+      var path = [lang, String(d.redirect_link || '').replace(/^\/+/, '')]
+        .filter(Boolean).join('/');
+      action = landing.domain + '/api/welcome';
+      redirect = withQuery(landing.domain + '/' + path);
+    }
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = landing.domain + '/api/welcome';
+    form.action = action;
     form.enctype = 'application/x-www-form-urlencoded';
     form.hidden = true;
-    [['tmpToken', token], ['redirect', withQuery(landing.domain + '/' + path)]].forEach(function (p) {
+    [['tmpToken', token], ['redirect', redirect]].forEach(function (p) {
       var input = document.createElement('input');
       input.type = 'hidden';
       input.name = p[0];
@@ -436,9 +449,11 @@
           });
         }).then(function (res) {
           var token = res && res.data && res.data.accessToken;
-          if (!token || !landing.domain) throw new Error('registered, but no accessToken or no casino domain');
+          var redirectUrl = res && res.data && res.data.redirectUrl;
+          if (!token) throw new Error('registered, but no accessToken');
+          if (!redirectUrl && !landing.domain) throw new Error('registered, but no redirectUrl or casino domain');
           if (window.TW) TW.track('form_success', { method: 'email' });
-          sso(token, window.TWI18n ? TWI18n.tag() : document.documentElement.lang);          // busy stays on: the page is leaving
+          sso(token, redirectUrl);          // busy stays on: the page is leaving
         });
       }).catch(function (err) {
         console.warn('[platform] registration failed:', err && err.message);

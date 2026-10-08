@@ -124,6 +124,9 @@ email + password only** — the phone tab is removed, because the API is
    IT's own `TEMP_CONFIG` (landing id **8**, `api2-land-dev.jack-pot.tech`).
    **Everywhere else** it fetches `config.json` from the site root:
    `{ "id": <number>, "email_registration": "<url>", "landing": "<url>" }`.
+   Our landing is **id 12** on `api2-land-prod.top-win.promo`, and it runs live
+   at https://landings.top-win.promo/testnewland1243/. Its values are in
+   `config.example.json`, which the page never reads (see "New LP from this one").
 2. **Landing.** `GET config.landing` on every load. If `data.active` is false
    the page shows a "temporarily unavailable" card (mailto
    `platform.supportEmail`) in the visitor's language and nothing else works.
@@ -138,11 +141,16 @@ email + password only** — the phone tab is removed, because the API is
    `ru` or `en`. The URL parameters in `campaign.js § passthrough` and
    `form.hiddenFields` go **first**, so they can add fields and can never
    overwrite one of those.
-4. **Success.** `response.data.accessToken` is POSTed (hidden form,
-   `application/x-www-form-urlencoded`) to `<casino>/api/welcome` as `tmpToken`,
-   with `redirect=<casino>/<lang>/<redirect_link>?<page query>`; `<casino>` is
-   the host of `data.rules`. The player arrives logged in. The template's
-   confirmation screen — which shows a login and a password — is **never shown**.
+4. **Success.** The API answers with `response.data.accessToken` and
+   `response.data.redirectUrl`. TopWin's `redirectUrl` is the tracker mirror with
+   `modal=signIn`. The token is POSTed (hidden form,
+   `application/x-www-form-urlencoded`) to `<mirror>/api/welcome` as `tmpToken`,
+   with `redirect` = the `redirectUrl` plus the page's query string. The player
+   arrives logged in. Without `redirectUrl` the older path is the fallback: the
+   token goes to `<casino>/api/welcome` with
+   `redirect=<casino>/<lang>/<redirect_link>?<page query>`, where `<casino>` is
+   the host of `data.rules`. The template's confirmation screen — which shows a
+   login and a password — is **never shown**.
 5. **Errors.** `{ "errors": ["…"] }` is read: "already registered" and
    anything mentioning reCAPTCHA get their own message in UA / RU / EN
    (`campaign.js § strings`: `err.exists`, `err.recaptcha`). Anything else,
@@ -150,11 +158,12 @@ email + password only** — the phone tab is removed, because the API is
    While the request runs the submit button is disabled.
 
 > **The Content-Security-Policy `<meta>` in `index.html` is written for this**
-> and names the origins one by one. Two things are open and **both fail
-> silently** (a CSP refusal appears only in the browser console):
-> the **production API origin** must be added to `connect-src` (only IT's dev
-> host is there, marked TEMP), and **`form-action 'self' https://<casino>`**
-> must be added for the SSO POST once IT names the casino domain. See the
+> and names the origins one by one. The production API origin
+> (`https://api2-land-prod.top-win.promo`) is in `connect-src`. One thing is
+> still open, and it **fails silently** (a CSP refusal appears only in the
+> browser console): **`form-action 'self' https://<casino>`** for the SSO POST,
+> once IT names the casino domain. With `redirectUrl` the POST goes to the
+> mirror, so IT must also confirm which origin(s) the POST goes to. See the
 > comment above the `<meta>`.
 
 The password is in the registration body, so `config.email_registration` must
@@ -162,6 +171,35 @@ be the operator's own TLS endpoint and nowhere else.
 
 `form.endpoint` and `form.onRegister` in `campaign.js` are no longer the seam:
 `onRegister` calls `window.TWPlatform.register`, which overrides `endpoint`.
+
+---
+
+## New LP from this one
+
+`config.example.json` holds the production config of **this** landing (id 12):
+
+    {
+      "id": 12,
+      "trackingId": "https://api2-landings.fsolutions.top/tracking-landings-event",
+      "email_registration": "https://api2-land-prod.top-win.promo/api/jp/registration/email",
+      "landing": "https://api2-land-prod.top-win.promo/api/jp/landing/12"
+    }
+
+The page never reads it: `js/platform.js` reads only `config.json`, so the page
+stays in demo mode. The Pages deploy does not publish it either.
+
+To make a new LP from this repo:
+
+1. Copy `config.example.json` to `config.json` **on the server only**. Never
+   commit it, and never add it to the repo.
+2. Put the new landing's own `id` in it, and its `landing/<id>` URL in
+   `landing`.
+3. Never ship id `12` with another LP. A copied LP would register its players
+   into landing 12 silently. The page would look fine and the only symptom would
+   be wrong statistics.
+
+`trackingId` is in IT's config, but neither this page nor IT's code uses it.
+It is kept in the example, and nothing reads it.
 
 ---
 

@@ -142,10 +142,13 @@ How it works:
 
    `language` is `uk`, `ru` or `en`. The URL params are spread FIRST, so a
    parameter called `email` or `landing_id` cannot overwrite the real field.
-3. Success: `response.data.accessToken` is POSTed to `<casino>/api/welcome` as
-   `tmpToken`, with `redirect=<casino>/<lang>/<redirect_link>?<page query>`.
-   `<casino>` is the host of `data.rules`. The confirmation screen that shows a
-   login and a password is never shown.
+3. Success: `response.data.accessToken` and `response.data.redirectUrl` come
+   back. The token is POSTed to `<mirror>/api/welcome` as `tmpToken`, where
+   `<mirror>` is the origin of `redirectUrl`, with `redirect` = `redirectUrl` plus
+   the page's query string. Without `redirectUrl` the fallback is
+   `<casino>/api/welcome`, with `redirect=<casino>/<lang>/<redirect_link>?<page query>`,
+   where `<casino>` is the host of `data.rules`. The confirmation screen that
+   shows a login and a password is never shown.
 4. Errors: `{{ errors: [msg] }}`. "already registered" and anything mentioning
    reCAPTCHA get their own translated message; everything else is the generic
    "could not send".
@@ -156,9 +159,12 @@ How it works:
 
 **Production.** The page fetches `config.json` from the site root:
 
-    {{ "id": <numeric landing_id>,
+    {{ "id": 12,
       "email_registration": "https://<api host>/api/jp/registration/email",
-      "landing": "https://<api host>/api/jp/landing/<id>" }}
+      "landing": "https://<api host>/api/jp/landing/12" }}
+
+**Our landing is 12 on `api2-land-prod.top-win.promo`.** It runs live at
+https://landings.top-win.promo/testnewland1243/.
 
 **WITHOUT `config.json` THE PAGE IS NOT CONNECTED.** It still looks finished:
 the form validates, writes a warning to the browser console and shows the demo
@@ -166,21 +172,18 @@ confirmation screen. Check the console on the first deploy.
 
 ### What you have to supply or change
 
-1. **`config.json`**, with the real **`landing_id`** for this landing (the
-   zip's 8 is your own landing, not ours) and the **production API host**.
-2. **CORS** on the landing and registration endpoints for the domain this page
+1. **CORS** on the landing and registration endpoints for the domain this page
    is served from: a `GET` carrying `Content-Type: application/json` (so a
    preflight) and a JSON `POST`.
-3. **The reCAPTCHA v3 key** (`recaptcha_key` in the landing response) must be
+2. **The reCAPTCHA v3 key** (`recaptcha_key` in the landing response) must be
    registered for THIS page's domain with Google.
-4. **The Content-Security-Policy `<meta>` in `index.html`**, in two places. A
-   CSP refusal shows ONLY in the browser console; the visitor sees nothing:
-   - add the production API origin to `connect-src` (only your dev host is
-     there, marked TEMP);
-   - add `form-action 'self' https://<casino domain>` for the `/api/welcome`
-     POST. The directive is absent today because that domain comes from the
-     API at runtime and could not be written here.
-5. **Confirm, because we could not test against the real API:**
+3. **The Content-Security-Policy `<meta>` in `index.html`.** A CSP refusal shows
+   ONLY in the browser console; the visitor sees nothing. Add
+   `form-action 'self' https://<casino domain>` for the `/api/welcome` POST. The
+   directive is absent today because that domain comes from the API at runtime
+   and could not be written here. The production API origin is already in
+   `connect-src`.
+4. **Confirm, because we could not test against the real API:**
    - the registration endpoint accepts `language: "uk"` and `"ru"` (your
      landing sends `en` / `de`);
    - the casino site has `/uk/` and `/ru/` routes for the redirect, and what
@@ -189,7 +192,7 @@ confirmation screen. Check the console on the first deploy.
      "already registered" and "recaptcha" loosely, anything else is generic;
    - that `status.json` in your zip is read by your infrastructure, not by the
      page: nothing here references it.
-6. **The reCAPTCHA v3 badge is hidden** (`.grecaptcha-badge` in `css/styles.css`),
+5. **The reCAPTCHA v3 badge is hidden** (`.grecaptcha-badge` in `css/styles.css`),
    as your landing does it. The `clientIp` from `api.ipify.org` is sent too, as
    your landing does it. Both follow your LP.
 
