@@ -6,10 +6,14 @@
    DOM that js/shell.js has already built by the time this file runs (it is
    loaded after shell.js, which mounts the dialog synchronously in boot()).
 
-   It follows IT's reference landing step for step (their _js/main.js), so their
-   deploy drops in: same config shape, same two requests, same body, same SSO.
+   Platform connection = IT's template (owner, 2026-11-11). The requests, their
+   headers, their order and the registration body are IT's reference landing
+   (their _js/main.js, _js/api/resilve-recaptcha.js, _js/utils/url.js), step
+   for step. A deviation needs the owner's AND IT's OK; the ones left are
+   listed in the decision "Platform connection = IT's template" (topwin-lp
+   skill) and are not on the request path, except where noted below.
 
-   ── The flow ─────────────────────────────────────────────────
+   ── The flow (IT's) ──────────────────────────────────────────
    1. config.   Development (localhost, 127.0.0.1, or an origin containing
                 https://land-crm) uses campaign.js § platform.dev when all three
                 of its values are filled in: a TopWin dev landing that only IT
@@ -17,19 +21,33 @@
                 without a request, and land-crm reads config.json like
                 production. Everywhere else config.json is fetched from the
                 site root: { id, email_registration, landing }.
-   2. landing.  GET config.landing -> { data: { active, recaptcha_key, country,
+   2. landing.  GET config.landing with Content-Type and Accept
+                application/json -> { data: { active, recaptcha_key, country,
                 currency, promocode, rules, policy, login, redirect_link } }.
-                active false: the "unavailable" card, and nothing else happens.
-                Otherwise the Terms / Privacy / Login links come from the API,
-                each only if its host is a TopWin host (isTopWinUrl), and
-                reCAPTCHA v3 is loaded with the key the API gave us.
-   3. submit.   reCAPTCHA token, visitor IP, then POST config.email_registration.
-   4. success.  response.data.accessToken and response.data.redirectUrl.
+                Analytics first, then: active false: the "unavailable" card
+                with support@top-win.com, and nothing else happens. Otherwise
+                reCAPTCHA v3 api.js?render=<key> is loaded, and the Terms /
+                Privacy / Login links are set to the API's URLs exactly as IT
+                does (no host filter), with the page's query appended.
+   3. ip.       GET https://api.ipify.org?format=json once at load, as IT does;
+                the IP is kept and read at submit ("" if it has not come).
+   4. submit.   The body, built like IT's:
+                  { email, password, landing_id, language, currency, country,
+                    promocode, receivePromos: true, clientIp, ...urlParams }
+                every URL parameter spread LAST (so it can overwrite a field,
+                as on IT's page), then grecaptcha.execute(key, {action:
+                "register"}) sets "g-recaptcha-response" on it, then POST
+                config.email_registration with Content-Type: application/json.
+                `language` is the active language button's text lowercased,
+                as IT sends it: ua, ru or en.
+   5. success.  PENDING IT ANSWER (owner, 2026-11-11): the SSO hand-off below
+                is kept as it was until IT says which is right.
+                response.data.accessToken and response.data.redirectUrl.
                 TopWin returns redirectUrl: the tracker mirror with modal=signIn.
                 That URL is POSTed to <mirror>/api/welcome as tmpToken + redirect.
-                The landing's redirect_link is not used for that hand-off.
-                Without redirectUrl, the older path remains: <rules host>/api/welcome
-                and /{lang}/{redirect_link}. The confirmation screen is never shown.
+                Without redirectUrl, IT's path: <rules host>/api/welcome and
+                redirect /{language}/{redirect_link}. The confirmation screen
+                is never shown.
 
    ── What form.js does with what we return ────────────────────
    onRegister's result is awaited. Resolve -> showDone() with the credentials.
@@ -53,7 +71,6 @@
 
   var C = window.TW_CAMPAIGN || {};
   var P = C.platform || {};
-  var F = C.form || {};
 
   var dialog = document.getElementById('tw-signup');
 
@@ -99,6 +116,7 @@
   var configP = null;
   var landingP = null;
   var recaptchaP = null;
+  var ipAddress = '';      // IT's registerFormState.ipAddress: filled by ipify at load
   var landing = null;      // { data, config, domain } once active
   var analyticsOn = false; // injectAnalytics runs once, even if the landing is retried
   var offShown = false;
@@ -117,20 +135,11 @@
     return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   }
 
-  /* The landing API hands us links that go on the page. Only TopWin's own
-     hosts are accepted: a domain whose name starts with topwin or top-win
-     (topwin-bet.club, which the live API returns for landings 12 and 13;
-     top-win.promo) and its subdomains, and the tracker twredirect.com. One
-     TLD only, so topwin.evil.com is refused. Anything else is skipped with a warning,
-     so a wrong landing behind the API cannot send visitors to another brand. */
-  function isTopWinUrl(href) {
-    var u;
-    try { u = new URL(href); } catch (e) { return false; }
-    if (u.protocol !== 'https:') return false;
-    var h = u.hostname.toLowerCase();
-    return /(^|\.)top-?win[a-z0-9-]*\.[a-z]{2,}$/.test(h) ||
-           /(^|\.)twredirect\.com$/.test(h);
-  }
+  /* The links the landing API hands us go on the page as they come, like IT's
+     page does. The TopWin host filter that stood here (isTopWinUrl) was
+     removed on 2026-11-11: the owner decided the connection must be IT's, and
+     IT applies the API's links without a check. What the API returns for a
+     landing is IT's to keep right. */
 
   /* Resolves to the config object, or null when there is none to find. Only a
      404 on config.json means "nobody deployed one"; a network failure or a
@@ -139,7 +148,7 @@
     if (isDevelopment() && devConfig()) return Promise.resolve(devConfig());
     if (isLocal()) return Promise.resolve(null);   // no TopWin dev landing yet: the demo path
     if (configP) return configP;
-    configP = fetch(P.configUrl || 'config.json', { cache: 'no-store' })
+    configP = fetch(P.configUrl || 'config.json')   // IT: fetch("config.json"), no options
       .then(function (r) {
         if (r.status === 404) return null;
         if (!r.ok) throw new Error('config.json: HTTP ' + r.status);
@@ -156,11 +165,29 @@
     return configP;
   }
 
+  /* IT's addParamsToUrl(url, getQueryParams()): the page's raw query string,
+     after "?" or "&". */
   function withQuery(href) {
     if (!href) return href;
     var q = location.search ? location.search.slice(1) : '';
     if (!q) return href;
     return href + (href.indexOf('?') < 0 ? '?' : '&') + q;
+  }
+
+  /* IT's getURLParams(): every parameter on the page URL, decoded, the last
+     one winning when a name repeats. No whitelist: IT sends them all. */
+  function urlParams() {
+    var out = {};
+    new URLSearchParams(location.search).forEach(function (value, key) { out[key] = value; });
+    return out;
+  }
+
+  /* IT's language value: the active language button's text, lowercased. Our
+     buttons show the internal code in capitals (UA, RU, EN), so this is ua,
+     ru or en -- not the BCP-47 tag (uk) that <html lang> carries. */
+  function language() {
+    var code = window.TWI18n ? TWI18n.current() : '';
+    return String(code || 'en').toLowerCase();
   }
 
   /* The links are set on the anchors and set AGAIN on a language change:
@@ -172,7 +199,6 @@
     var map = { terms: landing.data.rules, privacy: landing.data.policy, login: landing.data.login };
     Object.keys(map).forEach(function (name) {
       if (!map[name]) return;     // keep whatever campaign.js links.* gave it
-      if (!isTopWinUrl(map[name])) return;   // warned once in loadLanding
       Array.prototype.forEach.call(document.querySelectorAll('[data-tw-link="' + name + '"]'), function (a) {
         a.setAttribute('href', withQuery(map[name]));
       });
@@ -182,8 +208,7 @@
   function loadRecaptcha(key) {
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
-      s.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(key);
-      s.async = true;
+      s.src = 'https://www.google.com/recaptcha/api.js?render=' + key;   // IT's URL, verbatim
       s.onload = function () { resolve(); };
       s.onerror = function () { reject(new Error('recaptcha script did not load')); };
       document.body.appendChild(s);
@@ -196,7 +221,8 @@
     landingP = loadConfig().then(function (cfg) {
       if (!cfg) return 'demo';
       return fetch(cfg.landing, {
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }   // IT's API_HEADERS
       }).then(function (r) {
         if (!r.ok) throw new Error('landing: HTTP ' + r.status);
         return r.json();
@@ -207,20 +233,16 @@
         if (!d.active) { showOff(); return 'off'; }
         if (!d.recaptcha_key) throw new Error('landing: no recaptcha_key');
 
-        ['rules', 'policy', 'login'].forEach(function (k) {
-          if (d[k] && !isTopWinUrl(d[k])) {
-            console.warn('[platform] skipped a landing link (' + k + '): not a TopWin host');
-          }
-        });
+        /* IT's order: reCAPTCHA script, then the domain, then the links. */
+        recaptchaP = loadRecaptcha(d.recaptcha_key);
+        recaptchaP.catch(function () { /* reported at submit, where the visitor is */ });
+
+        /* IT: registerFormState.domain = "https://" + new URL(data.rules).hostname */
         var domain = '';
-        if (isTopWinUrl(d.rules)) {
-          try { domain = 'https://' + new URL(d.rules).hostname; } catch (e) { /* no SSO target */ }
-        }
+        try { domain = 'https://' + new URL(d.rules).hostname; } catch (e) { /* no rules URL: no SSO target */ }
         landing = { data: d, config: cfg, domain: domain };
 
         applyLinks();
-        recaptchaP = loadRecaptcha(d.recaptcha_key);
-        recaptchaP.catch(function () { /* reported at submit, where the visitor is */ });
         return 'ready';
       });
     });
@@ -232,10 +254,11 @@
   }
 
   /* ── analytics, as IT's LP does it (their _js/analytics.js) ─
-     IT pastes these into inline <script> text. Our CSP has no 'unsafe-inline',
-     so that text would be blocked silently. Here the functions live in this
-     file and only <script src> elements are appended. The IDs are the only
-     thing that reaches code, so each one is checked before use. */
+     IT pastes these into inline <script> text. Here the functions live in this
+     file and only <script src> elements are appended; the same tags load.
+     The IDs are the only thing that reaches code, so each one is checked
+     before use. Not part of the registration request; left as it was (owner,
+     2026-11-11: analytics injection stays ours). */
 
   var ID_PATTERN = {
     google: /^(G-[A-Z0-9]+|UA-\d+-\d+)$/,
@@ -361,16 +384,13 @@
     if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
   }
 
-  /* IT's call, with a ceiling: a slow third party must not hold a registration
-     hostage. Empty string on any failure, as theirs does. */
-  function clientIp() {
-    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 3000);
-    return fetch('https://api.ipify.org?format=json', ctl ? { signal: ctl.signal } : {})
+  /* IT's call, made once at page load, not at submit: the IP is kept and the
+     submit reads whatever is there, "" if ipify has not answered or failed. */
+  function loadIp() {
+    fetch('https://api.ipify.org?format=json')
       .then(function (r) { return r.json(); })
-      .then(function (j) { return (j && j.ip) || ''; })
-      .catch(function () { return ''; })
-      .then(function (ip) { clearTimeout(timer); return ip; });
+      .then(function (j) { ipAddress = (j && j.ip) || ''; })
+      .catch(function (e) { console.warn('[platform] could not get the visitor IP:', e && e.message); });
   }
 
   function recaptchaToken() {
@@ -422,7 +442,12 @@
      token must travel in a body, never in a URL that history and referrers
      keep. tmpToken is a one-shot login ticket, not the password.
      When the API returns redirectUrl, welcome is posted to that mirror and
-     redirect is the sign-in page. The CRM redirect_link is only the fallback. */
+     redirect is the sign-in page. The CRM redirect_link is only the fallback.
+     PENDING IT ANSWER (owner, 2026-11-11): IT's template has only the
+     fallback path (<rules host>/api/welcome, /{lang}/{redirect_link}, and a
+     button the visitor clicks). The owner asked IT which is right; until
+     they answer, this stays as it was. The fallback's {lang} is IT's
+     redirectLang, the same lowercased button text the body sends. */
   function sso(token, redirectUrl) {
     var action, redirect;
     if (redirectUrl) {
@@ -431,7 +456,7 @@
       redirect = withQuery(redirectUrl);
     } else {
       var d = landing.data;
-      var lang = window.TWI18n ? TWI18n.tag() : document.documentElement.lang;
+      var lang = language();
       var path = [lang, String(d.redirect_link || '').replace(/^\/+/, '')]
         .filter(Boolean).join('/');
       action = landing.domain + '/api/welcome';
@@ -468,28 +493,25 @@
         }
         if (state === 'off') { setBusy(false); return null; }       // the card says why
 
+        /* IT's body, key for key and in IT's order, built before reCAPTCHA
+           runs. The URL parameters are spread LAST, exactly as IT's
+           `...params` -- so a parameter named like a field overwrites it, as
+           it does on IT's page (owner, 2026-11-11: identical to IT).
+           campaign.js form.hiddenFields is NOT sent: IT has no such thing. */
+        var body = assign({
+          email: document.getElementById('tw-email').value.trim(),
+          password: document.getElementById('tw-password').value,
+          landing_id: landing.config.id,
+          language: language(),
+          currency: landing.data.currency || null,
+          country: landing.data.country || null,
+          promocode: landing.data.promocode || null,
+          receivePromos: true,
+          clientIp: ipAddress
+        }, urlParams());
         return recaptchaToken().then(function (token) {
-          return clientIp().then(function (ip) {
-            /* Everything we do not own goes FIRST, so a URL parameter or a
-               hiddenFields entry named email or landing_id can never
-               overwrite a real field. The values come from the inputs and
-               from i18n, not from `payload`: form.js has already merged
-               hiddenFields and the params ONTO that object, over its own
-               fields, so reading email from it would read the overwrite. */
-            var body = assign({}, F.hiddenFields, window.TW ? TW.params() : {}, {
-              email: document.getElementById('tw-email').value.trim(),
-              password: document.getElementById('tw-password').value,
-              landing_id: landing.config.id,
-              language: window.TWI18n ? TWI18n.tag() : document.documentElement.lang,
-              currency: landing.data.currency || null,
-              country: landing.data.country || null,
-              promocode: landing.data.promocode || null,
-              receivePromos: true,
-              clientIp: ip,
-              'g-recaptcha-response': token
-            });
-            return post(body);
-          });
+          body['g-recaptcha-response'] = token;   // IT's executeRecaptcha: data["g-recaptcha-response"] = token
+          return post(body);
         }).then(function (res) {
           var token = res && res.data && res.data.accessToken;
           var redirectUrl = res && res.data && res.data.redirectUrl;
@@ -517,4 +539,8 @@
   /* Started at load, not at the first submit: an inactive landing must show
      its card before the visitor plays a game they cannot finish. */
   loadLanding().catch(function () { /* warned above */ });
+  /* IT starts ipify at load too, right after the config request. Not on the
+     demo path (localhost without a dev landing): no request leaves a page
+     that is not connected. */
+  if (!(isLocal() && !devConfig())) loadIp();
 }());

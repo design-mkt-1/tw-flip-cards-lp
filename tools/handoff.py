@@ -122,37 +122,46 @@ cosmetic one.
 
 ## 3. The platform connection -- WHAT WE NEED FROM YOU
 
-`js/platform.js` is written against your own reference landing (the zip you
-sent), step for step. The form is **email + password only**: the phone tab is
-removed because the API is `registration/email`.
+`js/platform.js` is your template's connection (your `_js/main.js`), step for
+step: the same requests, headers, order and body. The form is **email +
+password only**: the phone tab is removed because the API is
+`registration/email`.
 
 How it works:
 
-1. `GET config.landing` on every load (`Content-Type` and `Accept:
-   application/json`). `data.active` false -> a "temporarily unavailable" card
-   in UA / RU / EN, and nothing else works. It shows `platform.supportEmail`
-   from `campaign.js`: TopWin's support address is **support@top-win.com**
-   (a mailto link under the sentence "...or write to us:"). If that value is
+1. `config.json` (below), then `GET config.landing` with `Content-Type` and
+   `Accept: application/json`. Analytics come from the landing response.
+   `data.active` false -> a "temporarily unavailable" card in UA / RU / EN,
+   and nothing else works. It shows `platform.supportEmail` from
+   `campaign.js`: TopWin's support address is **support@top-win.com** (a
+   mailto link under the sentence "...or write to us:"). If that value is
    ever emptied, the card carries no address.
-   Otherwise the Terms / Privacy / Login links come from `rules` / `policy` /
-   `login`, and reCAPTCHA v3 loads with `data.recaptcha_key`.
-2. Submit: reCAPTCHA token (action `register`), the visitor's IP from
-   `api.ipify.org`, then `POST config.email_registration`:
+   Otherwise reCAPTCHA v3 loads (`api.js?render=<recaptcha_key>`) and the
+   Terms / Privacy / Login links are set to `rules` / `policy` / `login` as
+   your API returns them, with the page's query string appended, as your
+   template does (no host filter).
+2. `GET https://api.ipify.org?format=json` once at page load; the IP is kept.
+3. Submit: `grecaptcha.execute(recaptcha_key, {{action: "register"}})`, then
+   `POST config.email_registration` with `Content-Type: application/json`:
 
        {{ email, password, landing_id, language, currency, country, promocode,
-         receivePromos: true, clientIp, "g-recaptcha-response",
-         ...URL params from the whitelist below }}
+         receivePromos: true, clientIp, ...every URL parameter,
+         "g-recaptcha-response" }}
 
-   `language` is `uk`, `ru` or `en`. The URL params are spread FIRST, so a
-   parameter called `email` or `landing_id` cannot overwrite the real field.
-3. Success: `response.data.accessToken` and `response.data.redirectUrl` come
+   exactly as your template builds it: every parameter on the page URL is
+   spread LAST, so one named like a field overwrites it, as on your page.
+   `language` is the active language button lowercased, as in your template:
+   `ua`, `ru` or `en`.
+4. Success -- PENDING YOUR ANSWER: which hand-off is right for TopWin? Today:
+   `response.data.accessToken` and `response.data.redirectUrl` come
    back. The token is POSTed to `<mirror>/api/welcome` as `tmpToken`, where
    `<mirror>` is the origin of `redirectUrl`, with `redirect` = `redirectUrl` plus
    the page's query string. Without `redirectUrl` the fallback is
    `<casino>/api/welcome`, with `redirect=<casino>/<lang>/<redirect_link>?<page query>`,
    where `<casino>` is the host of `data.rules`. The confirmation screen that
-   shows a login and a password is never shown.
-4. Errors: `{{ errors: [msg] }}`. "already registered" and anything mentioning
+   shows a login and a password is never shown. Your template has only the
+   fallback path, behind a button the visitor clicks.
+5. Errors: `{{ errors: [msg] }}`. "already registered" and anything mentioning
    reCAPTCHA get their own translated message; everything else is the generic
    "could not send".
 
@@ -182,17 +191,18 @@ confirmation screen. Check the console on the first deploy.
    preflight) and a JSON `POST`.
 2. **The reCAPTCHA v3 key** (`recaptcha_key` in the landing response) must be
    registered for THIS page's domain with Google.
-3. **The Content-Security-Policy `<meta>` in `index.html`.** A CSP refusal shows
-   ONLY in the browser console; the visitor sees nothing. Add
-   `form-action 'self' https://<casino domain>` for the `/api/welcome` POST. The
-   directive is absent today because that domain comes from the API at runtime
-   and could not be written here. The production API origin is already in
-   `connect-src`.
+3. **No Content-Security-Policy.** `index.html` has none, as your template has
+   none. If your server adds one as a header, it must allow everything above:
+   your API, `api.ipify.org`, `www.google.com/recaptcha/` +
+   `www.gstatic.com/recaptcha/`, the analytics hosts, and the `/api/welcome`
+   origin of step 4.
 4. **Confirm, because we could not test against the real API:**
-   - the registration endpoint accepts `language: "uk"` and `"ru"` (your
-     landing sends `en` / `de`);
-   - the casino site has `/uk/` and `/ru/` routes for the redirect, and what
-     `redirect_link` should be;
+   - the registration endpoint accepts `language: "ua"`, `"ru"` and `"en"`
+     (your template's rule, the language button lowercased; your sample
+     archive has only `EN` / `DE` buttons);
+   - the casino site has `/ua/`, `/ru/` and `/en/` routes for the fallback
+     redirect, and what `redirect_link` should be;
+   - which SSO hand-off is right (step 4);
    - whether the registration error texts are stable English strings: we match
      "already registered" and "recaptcha" loosely, anything else is generic;
    - that `status.json` in your zip is read by your infrastructure, not by the
@@ -222,10 +232,8 @@ with the same id attached. If your redirect drops these, the attribution is
 lost here and nowhere else.
 
 GA, Yandex Metrika and GTM load from the landing API response, as in your
-landing: `js/platform.js` injects them, and the CSP `<meta>` in index.html
-already names their domains. Invalid IDs are skipped with a console warning.
-Known limit: GTM loads whatever tags your container holds, and those may need
-more CSP domains. Only the console on the first real test shows which.
+landing: `js/platform.js` injects them. Invalid IDs are skipped with a
+console warning.
 `analytics.gtmId` / `analytics.metaPixelId` in campaign.js are still read by
 the shared template's `js/shell.js`, so they are a second, separate GTM and
 Meta Pixel source. Leave them empty unless you want that.

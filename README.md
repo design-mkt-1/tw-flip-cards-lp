@@ -133,18 +133,20 @@ email + password only** — the phone tab is removed, because the API is
 2. **Landing.** `GET config.landing` on every load. If `data.active` is false
    the page shows a "temporarily unavailable" card (mailto
    `platform.supportEmail`, which is support@top-win.com) in the visitor's language and nothing else works.
-   Otherwise `data.rules` / `policy` / `login` become the Terms, Privacy and
-   Login links (with the page's query string appended), and reCAPTCHA v3 is
-   loaded with `data.recaptcha_key`.
-3. **Submit.** `grecaptcha.execute(key, {action: 'register'})`, the visitor's IP
-   from `api.ipify.org` (3 s ceiling, `""` on failure), then
-   `POST config.email_registration` with
-   `email, password, landing_id, language, currency, country, promocode,
-   receivePromos: true, clientIp, g-recaptcha-response`. `language` is `uk`,
-   `ru` or `en`. The URL parameters in `campaign.js § passthrough` and
-   `form.hiddenFields` go **first**, so they can add fields and can never
-   overwrite one of those.
-4. **Success.** The API answers with `response.data.accessToken` and
+   Otherwise reCAPTCHA v3 is loaded (`api.js?render=<recaptcha_key>`) and
+   `data.rules` / `policy` / `login` become the Terms, Privacy and Login links
+   as the API returns them (no host filter, as IT's template), with the page's
+   query string appended. The visitor's IP is fetched once at load from
+   `api.ipify.org` (`""` if it has not come).
+3. **Submit.** IT's template, step for step (owner, 2026-11-11): the body
+   `{ email, password, landing_id, language, currency, country, promocode,
+   receivePromos: true, clientIp, ...every URL parameter }`, the URL
+   parameters spread **last** as IT does (one named like a field overwrites
+   it), then `grecaptcha.execute(key, {action: 'register'})` adds
+   `g-recaptcha-response`, then `POST config.email_registration` with
+   `Content-Type: application/json`. `language` is IT's code, the language
+   button lowercased: `ua`, `ru` or `en`. `form.hiddenFields` is not sent.
+4. **Success (PENDING IT's answer -- kept as it was).** The API answers with `response.data.accessToken` and
    `response.data.redirectUrl`. TopWin's `redirectUrl` is the tracker mirror with
    `modal=signIn`. The token is POSTed (hidden form,
    `application/x-www-form-urlencoded`) to `<mirror>/api/welcome` as `tmpToken`,
@@ -160,14 +162,8 @@ email + password only** — the phone tab is removed, because the API is
    including a network failure, is the template's generic "could not send".
    While the request runs the submit button is disabled.
 
-> **The Content-Security-Policy `<meta>` in `index.html` is written for this**
-> and names the origins one by one. The production API origin
-> (`https://api2-land-prod.top-win.promo`) is in `connect-src`. One thing is
-> still open, and it **fails silently** (a CSP refusal appears only in the
-> browser console): **`form-action 'self' https://<casino>`** for the SSO POST,
-> once IT names the casino domain. With `redirectUrl` the POST goes to the
-> mirror, so IT must also confirm which origin(s) the POST goes to. See the
-> comment above the `<meta>`.
+> **No Content-Security-Policy.** `index.html` has none, as IT's template has
+> none (owner, 2026-11-11). The comment where the `<meta>` stood says why.
 
 The password is in the registration body, so `config.email_registration` must
 be the operator's own TLS endpoint and nowhere else.
@@ -224,8 +220,6 @@ the password the visitor typed is never put back on screen.
 - **Analytics load from the landing response, as in IT's LP.** GA, Yandex
   Metrika and GTM IDs come from `GET landing`, and `js/platform.js` injects
   them (`injectAnalytics`). Invalid IDs are skipped with a console warning.
-  Known limit: GTM loads whatever tags IT's container holds, and those may
-  need more CSP domains. Only the console on the first real test shows which.
   Demo mode (no `config.json`) loads none.
 - **No cookies of ours** (reCAPTCHA and the analytics tags set their own).
 - **No password policy** beyond a minimum length (`form.passwordMin` in

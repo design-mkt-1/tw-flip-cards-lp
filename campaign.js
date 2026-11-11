@@ -70,8 +70,8 @@ window.TW_CAMPAIGN = {
      click — how an affiliate click id survives the landing. */
   passthrough: ['click_id', 'sub1', 'sub2', 'gclid', 'fbclid', 'ttclid'],
 
-  /* Both empty means not one third-party request. Setting either also needs
-     the CSP <meta> in index.html swapped for the analytics one. */
+  /* Both empty means no tag of ours. index.html has no CSP (IT's template
+     has none, owner 2026-11-11), so nothing else needs changing to set one. */
   analytics: {
     gtmId:       '',
     metaPixelId: '',
@@ -93,9 +93,10 @@ window.TW_CAMPAIGN = {
        POST and the SSO redirect. It overrides `endpoint`, which stays empty. */
     onRegister:   function (payload) { return window.TWPlatform.register(payload); },
     /* landing_id is NOT here any more: the platform's numeric id comes from
-       config.json, and a string of ours would only compete with it. Anything
-       put here is copied onto the request body BEFORE the platform's own
-       fields, so it can add a field but never overwrite one. */
+       config.json, and a string of ours would only compete with it. Nothing
+       put here reaches IT: js/platform.js builds IT's body exactly as IT's
+       template does, and IT's template has no hidden fields (owner,
+       2026-11-11). Only the endpoint path off the platform reads this. */
     hiddenFields: {},
     demoDone:     true,
     dialCode:     '+380',

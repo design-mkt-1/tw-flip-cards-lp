@@ -5,14 +5,14 @@ browser is intercepted before the network and every one of those origins is
 answered from here. Any OTHER non-local request is aborted and recorded in
 state['leaks'], so a test can assert the page asked for nothing it should not.
 
-The CSP in index.html is still enforced by the browser before interception, so
-a missing origin in it shows up as a console error exactly as it would live.
+index.html has no CSP (IT's template has none, owner 2026-11-11), so nothing
+is refused by the browser before interception.
 """
 
 import json
 
-# The production API. It is the only platform host in the page's CSP, so the
-# stub answers it; every request to it is intercepted and none reaches it.
+# The production API. The stub answers it; every request to it is
+# intercepted and none reaches it.
 PROD_API = 'https://api2-land-prod.top-win.promo'
 API = PROD_API
 APIS = (PROD_API,)
@@ -21,10 +21,11 @@ APIS = (PROD_API,)
 DEV = {'id': 7,
        'email_registration': API + '/api/jp/registration/email',
        'landing': API + '/api/jp/landing/7'}
-# TopWin-shaped like the live casino host topwin-bet.club (js/platform.js only
-# applies links on a TopWin host), on the reserved .test TLD so it never resolves.
+# Shaped like the live casino host topwin-bet.club, on the reserved .test TLD
+# so it never resolves.
 CASINO = 'https://casino.topwin-bet.test'
-# A host that is not TopWin's: the landing's links on it must be skipped.
+# A host that is not TopWin's. Since 2026-11-11 the page applies the landing's
+# links as IT's template does, with no host filter, so these are applied too.
 FOREIGN = 'https://casino.example.invalid'
 # The tracker mirror TopWin returns as redirectUrl. Its /api/welcome is answered like the casino's.
 MIRROR = 'https://mirror.example'
@@ -65,6 +66,9 @@ def new_state(**over):
         'recaptcha_ok': True,
         'ipify_ok': True,
         'registered': [],     # parsed JSON bodies sent to the registration API
+        'register_raw': [],   # {headers, body, method}: the request exactly as sent
+        'order': [],          # 'landing' | 'recaptcha_js' | 'ipify' | 'register', in arrival order
+        'recaptcha_src': [],  # every api.js URL the page asked for
         'sso': [],            # {url, body} of every POST to the casino
         'landing_gets': [],   # headers of every GET landing
         'leaks': [],          # anything else that left the page
@@ -110,7 +114,8 @@ def install(context, state, local_prefixes):
             return route.fulfill(status=204, headers=CORS)
 
         if any(url.startswith(a + '/api/jp/landing/') for a in APIS):
-            state['landing_gets'].append(req.headers)
+            state['landing_gets'].append(dict(req.headers, method=req.method))
+            state['order'].append('landing')
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body=json.dumps(landing_json(state)))
 
@@ -118,6 +123,9 @@ def install(context, state, local_prefixes):
             if state['register_abort']:
                 return route.abort()
             state['registered'].append(json.loads(req.post_data or '{}'))
+            state['register_raw'].append({'headers': req.headers, 'body': req.post_data or '',
+                                          'method': req.method})
+            state['order'].append('register')
             payload = state['register_json']
             if state['redirect_url']:
                 payload = {'data': dict(payload['data'], redirectUrl=state['redirect_url'])}
@@ -126,12 +134,15 @@ def install(context, state, local_prefixes):
                                  body=json.dumps(payload))
 
         if url.startswith('https://www.google.com/recaptcha/api.js'):
+            state['recaptcha_src'].append(url)
+            state['order'].append('recaptcha_js')
             result = ('Promise.resolve("STUB-TOKEN:" + key + ":" + opts.action)' if state['recaptcha_ok']
                       else 'Promise.reject(new Error("stub"))')
             return route.fulfill(status=200, content_type='application/javascript',
                                  body=RECAPTCHA_JS % result)
 
         if url.startswith('https://api.ipify.org'):
+            state['order'].append('ipify')
             if not state['ipify_ok']:
                 return route.abort()
             return route.fulfill(status=200, headers=CORS, content_type='application/json',

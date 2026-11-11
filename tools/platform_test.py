@@ -20,15 +20,23 @@ It walks the scenarios a visitor can actually hit:
                      support@top-win.com, a mailto and the full "write to us:"
                      sentence; an emptied address -> no mailto, no "write to us"
   no dev landing     localhost with platform.dev empty -> demo, no request
-  foreign links      rules / policy / login off a TopWin host are not applied
-  success + SSO      registration body, then the hidden POST to the casino,
-                     and the done screen (with the password) never shown
+  any host's links   rules / policy / login are applied as the API gives them,
+                     with no host filter, as IT's template does
+  IT's request       the POST body is IT's key for key and IN IT'S ORDER
+                     (email, password, landing_id, language, currency, country,
+                     promocode, receivePromos, clientIp, ...every URL param,
+                     g-recaptcha-response), headers are IT's (landing GET:
+                     Content-Type + Accept application/json; POST: Content-Type
+                     application/json), the order is IT's (landing GET,
+                     api.js?render=<key>, ipify at load, then the POST), and
+                     `language` is IT's code: ua, ru, en
+  success + SSO      the hidden POST to the casino, and the done screen (with
+                     the password) never shown. SSO is PENDING IT's answer.
   email taken        its own message in every language, button usable again
   reCAPTCHA failure  from the server and from the browser, its own message
   network failure    the template's generic line
   loading state      the button is disabled while the request is in flight
-  body safety        a field hiddenFields tries to set cannot overwrite email,
-                     landing_id or the rest
+  hiddenFields       not sent: IT's body has no such thing
   production config  no config.json -> demo path; a config.json -> used
   the card           the phone tab is gone, the links come from the landing
   analytics          GA, Yandex and GTM load from the landing response, as IT's
@@ -38,7 +46,7 @@ It walks the scenarios a visitor can actually hit:
   redirectUrl        TopWin's redirectUrl: the hand-off goes to its mirror, with
                      the page query; no redirectUrl and no casino domain -> the
                      generic line and nothing posted
-  CSP                the production API is in connect-src
+  no CSP             index.html has no Content-Security-Policy, as IT's has none
   badge              the reCAPTCHA badge is hidden, as IT's LP hides it
 """
 
@@ -248,50 +256,110 @@ def main():
                   not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
             r.close()
 
-            # ── links from the landing on a host that is not TopWin's ──
+            # ── links from the landing on any host: applied as IT does, no filter ──
             r = Run(browser, base, foreign_links=True)
-            warns = []
-            r.page.on('console', lambda m: warns.append(m.text) if m.type == 'warning' else None)
             r.open('lang=en')
             r.settle()
-            hrefs = r.page.evaluate("""() => Array.from(document.querySelectorAll('[data-tw-link]'))
-                .map(a => a.getAttribute('href') || '')""")
-            check('foreign links: none of them reaches an anchor',
-                  not any(stubmod.FOREIGN in h for h in hrefs), str(hrefs))
-            check('foreign links: each one skipped with a console warning',
-                  sum('not a TopWin host' in w for w in warns) == 3, str(warns))
+            links = r.page.evaluate("""() => ({
+                terms: document.querySelector('[data-tw-link="terms"]').getAttribute('href'),
+                privacy: document.querySelector('[data-tw-link="privacy"]').getAttribute('href'),
+                login: document.querySelector('[data-tw-link="login"]').getAttribute('href'),
+            })""")
+            want_links = {'terms': stubmod.FOREIGN + '/uk/rules?lang=en',
+                          'privacy': stubmod.FOREIGN + '/uk/privacy?lang=en',
+                          'login': stubmod.FOREIGN + '/uk/login?lang=en'}
+            check('any host: rules / policy / login applied as the API gives them (IT: no filter)',
+                  links == want_links, str(links))
             r.close()
 
-            # ── success + SSO ──
+            # ── IT's request: body key for key and in order, headers, order ──
             r = Run(browser, base).open('lang=ua&click_id=CLK1&sub1=S1&evil=1')
             r.settle()
-            r.page.evaluate("TW_CAMPAIGN.form.hiddenFields = {email: 'hacked', landing_id: 'hacked', extra: 'ok'}")
+            r.page.evaluate("TW_CAMPAIGN.form.hiddenFields = {email: 'hacked', landing_id: 'hacked', extra: 'no'}")
             r.fill_and_submit()
             r.page.wait_for_function(SSO_DONE, timeout=6000)
             body = r.state['registered'][0] if r.state['registered'] else {}
-            want = {'email': 'player@example.com', 'password': 'Sup3rSecret!', 'landing_id': stubmod.DEV['id'],
-                    'language': 'uk', 'currency': 'UAH', 'country': 'UA', 'promocode': 'PROMO-X',
-                    'receivePromos': True, 'clientIp': '203.0.113.7',
-                    'g-recaptcha-response': 'STUB-TOKEN:STUB-SITE-KEY:register',
-                    'click_id': 'CLK1', 'sub1': 'S1', 'extra': 'ok'}
-            wrong = {k: (body.get(k), v) for k, v in want.items() if body.get(k) != v}
-            check('success: registration body is IT\'s, field for field', not wrong, str(wrong))
-            check('success: reCAPTCHA ran with the API key and action "register"',
-                  body.get('g-recaptcha-response') == want['g-recaptcha-response'])
-            check('success: a URL param outside the whitelist is not sent', 'evil' not in body, str(body))
+            # IT's main.js: { email, password, landing_id, language, currency,
+            # country, promocode, receivePromos: true, clientIp, ...params },
+            # then resilve-recaptcha.js sets data["g-recaptcha-response"].
+            want = [('email', 'player@example.com'), ('password', 'Sup3rSecret!'),
+                    ('landing_id', stubmod.DEV['id']), ('language', 'ua'), ('currency', 'UAH'),
+                    ('country', 'UA'), ('promocode', 'PROMO-X'), ('receivePromos', True),
+                    ('clientIp', '203.0.113.7'),
+                    ('lang', 'ua'), ('click_id', 'CLK1'), ('sub1', 'S1'), ('evil', '1'),
+                    ('g-recaptcha-response', 'STUB-TOKEN:STUB-SITE-KEY:register')]
+            check('IT body: keys in IT\'s order, URL params spread last, then g-recaptcha-response',
+                  list(body.keys()) == [k for k, _ in want], str(list(body.keys())))
+            check('IT body: every value is IT\'s', list(body.items()) == want, str(list(body.items())))
+            check('IT body: hiddenFields is not sent', 'extra' not in body and body.get('email') != 'hacked', str(body))
+            raw = r.state['register_raw'][0] if r.state['register_raw'] else {}
+            check('IT POST: method POST, Content-Type application/json, body is JSON.stringify(data)',
+                  raw.get('method') == 'POST'
+                  and raw.get('headers', {}).get('content-type') == 'application/json'
+                  and raw.get('body') == json.dumps(dict(want), separators=(',', ':'), ensure_ascii=False),
+                  str(raw))
+            g = r.state['landing_gets']
+            check('IT landing GET: method GET, Content-Type + Accept application/json',
+                  len(g) == 1 and g[0].get('method') == 'GET' and g[0].get('accept') == 'application/json'
+                  and g[0].get('content-type') == 'application/json', str(g))
+            check('IT reCAPTCHA: api.js?render=<recaptcha_key>, once',
+                  r.state['recaptcha_src'] == ['https://www.google.com/recaptcha/api.js?render=STUB-SITE-KEY'],
+                  str(r.state['recaptcha_src']))
+            check('IT reCAPTCHA: executed with the API key and action "register"',
+                  body.get('g-recaptcha-response') == 'STUB-TOKEN:STUB-SITE-KEY:register')
+            order = r.state['order']
+            pos = {k: order.index(k) if k in order else -1 for k in ('landing', 'recaptcha_js', 'ipify', 'register')}
+            check('IT order: landing GET -> api.js -> POST; ipify once, before the POST',
+                  -1 not in pos.values() and pos['landing'] < pos['recaptcha_js'] < pos['register']
+                  and pos['ipify'] < pos['register'] and order.count('ipify') == 1
+                  and order.count('register') == 1, str(order))
             sso = r.state['sso']
             fields = parse_qs(sso[0]['body']) if sso else {}
             check('success: exactly one POST to <casino>/api/welcome',
                   len(sso) == 1 and sso[0]['method'] == 'POST'
                   and sso[0]['url'] == stubmod.CASINO + '/api/welcome', str(sso))
             check('success: tmpToken is the accessToken', fields.get('tmpToken') == ['TMP-TOKEN-123'], str(fields))
-            check('success: redirect is <casino>/<lang>/<redirect_link>?<page query>',
-                  fields.get('redirect') == [stubmod.CASINO + '/uk/lobby?lang=ua&click_id=CLK1&sub1=S1&evil=1'],
+            check('success: redirect is <casino>/<IT lang>/<redirect_link>?<page query>',
+                  fields.get('redirect') == [stubmod.CASINO + '/ua/lobby?lang=ua&click_id=CLK1&sub1=S1&evil=1'],
                   str(fields.get('redirect')))
             check('success: the password is not in the SSO post',
                   bool(sso) and 'Sup3rSecret' not in sso[0]['body'])
             check('success: only the stubbed origins were contacted, console clean',
                   not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
+            r.close()
+
+            # ── IT's language codes: the active language button, lowercased ──
+            for lang in ('ua', 'ru', 'en'):
+                r = Run(browser, base).open('lang=' + lang)
+                r.settle()
+                btn = r.page.evaluate("() => { const c = document.querySelector('.tw-lang__code');"
+                                      " return c ? c.textContent.trim() : ''; }")
+                r.fill_and_submit()
+                r.page.wait_for_function(SSO_DONE, timeout=6000)
+                sent = r.state['registered'][0].get('language') if r.state['registered'] else None
+                check('IT language, %s: button says %s, body sends %r' % (lang, lang.upper(), lang),
+                      sent == lang and btn == lang.upper(), '%r / button %r' % (sent, btn))
+                r.close()
+            r = Run(browser, base).open('lang=en')
+            r.settle()
+            r.page.evaluate("TW.setLang('ru')")
+            r.settle(150)
+            r.fill_and_submit()
+            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            sent = r.state['registered'][0].get('language') if r.state['registered'] else None
+            check('IT language: a switch to RU sends "ru"', sent == 'ru', str(sent))
+            r.close()
+
+            r = Run(browser, base).open('landing_id=999&promocode=URLCODE')
+            r.settle()
+            r.fill_and_submit()
+            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            body = r.state['registered'][0] if r.state['registered'] else {}
+            check('IT body: a URL param named like a field overwrites it, as on IT\'s page',
+                  body.get('landing_id') == '999' and body.get('promocode') == 'URLCODE'
+                  and list(body.keys())[:9] == ['email', 'password', 'landing_id', 'language', 'currency',
+                                                'country', 'promocode', 'receivePromos', 'clientIp'],
+                  str(body))
             r.close()
 
             # The confirmation screen shows the password the visitor just typed.
@@ -532,11 +600,10 @@ def main():
                   badge == ['0', 'none'], str(badge))
             r.close()
 
-            # ── CSP: the production API is allowed in connect-src ──
+            # ── no CSP: IT's index.html has none (owner, 2026-11-11) ──
             html = (ROOT / 'index.html').read_text(encoding='utf-8')
-            connect = re.search(r"connect-src ('self'[^;]*);", html).group(1).split()
-            check('CSP: connect-src has the production API, right after self',
-                  connect[:2] == ["'self'", stubmod.PROD_API], str(connect))
+            check('no CSP: index.html has no Content-Security-Policy meta, as IT\'s has none',
+                  not re.search(r'http-equiv=["\']?Content-Security-Policy', html, re.I))
         finally:
             browser.close()
             httpd.shutdown()
