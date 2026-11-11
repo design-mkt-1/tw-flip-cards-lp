@@ -130,7 +130,9 @@ How it works:
 
 1. `GET config.landing` on every load (`Content-Type` and `Accept:
    application/json`). `data.active` false -> a "temporarily unavailable" card
-   with `support@jack-pot.com`, in UA / RU / EN, and nothing else works.
+   in UA / RU / EN, and nothing else works. It shows `platform.supportEmail`
+   from `campaign.js`, which is EMPTY until you give us TopWin's support
+   address; while empty the card carries no address.
    Otherwise the Terms / Privacy / Login links come from `rules` / `policy` /
    `login`, and reCAPTCHA v3 loads with `data.recaptcha_key`.
 2. Submit: reCAPTCHA token (action `register`), the visitor's IP from
@@ -154,8 +156,10 @@ How it works:
    "could not send".
 
 **Development.** On localhost, 127.0.0.1 or `https://land-crm...` it uses
-`campaign.js` -> `platform.dev`, which is YOUR `TEMP_CONFIG` copied verbatim
-(landing id 8, `api2-land-dev.jack-pot.tech`). Replace or delete it.
+`campaign.js` -> `platform.dev` once it holds a TopWin dev landing. It is
+EMPTY: please give us a TopWin dev landing (id, landing URL, registration
+URL). Until then localhost runs the demo path and land-crm reads
+`config.json`.
 
 **Production.** The page fetches `config.json` from the site root:
 

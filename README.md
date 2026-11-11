@@ -120,8 +120,11 @@ email + password only** — the phone tab is removed, because the API is
 `registration/email`.
 
 1. **Config.** On `localhost`, `127.0.0.1` or an origin starting with
-   `https://land-crm` the page uses `platform.dev` in `campaign.js`, which is
-   IT's own `TEMP_CONFIG` (landing id **8**, `api2-land-dev.jack-pot.tech`).
+   `https://land-crm` the page uses `platform.dev` in `campaign.js` once all
+   three of its values are set. It is EMPTY: the dev landing it held belonged
+   to IT's other casino brand and was removed on 2026-11-11 (tw-lp-template
+   decision 21). A TopWin dev landing must be requested from IT; until then
+   localhost runs the demo path and land-crm reads `config.json`.
    **Everywhere else** it fetches `config.json` from the site root:
    `{ "id": <number>, "email_registration": "<url>", "landing": "<url>" }`.
    Our landing is **id 12** on `api2-land-prod.top-win.promo`, and it runs live

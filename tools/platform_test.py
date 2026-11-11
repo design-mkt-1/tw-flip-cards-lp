@@ -5,13 +5,21 @@ Headless test of js/platform.js against a stubbed IT platform.
     python tools/platform_test.py
 
 Same needs and same rules as tools/smoke.py: Playwright and one Chromium, the
-project served from a loopback port, and NOT ONE real request -- jack-pot.tech,
-ipify and Google are all answered by tools/platform_stub.py, and anything else
-that leaves the page fails the run.
+project served from a loopback port, and NOT ONE real request -- the platform
+API, ipify and Google are all answered by tools/platform_stub.py, and anything
+else that leaves the page fails the run.
+
+campaign.js ships platform.dev and platform.supportEmail EMPTY (TopWin has no
+dev landing and no known support address yet). Each run injects stubmod.DEV as
+platform.dev before campaign.js is read, so the flows run as on a configured
+localhost; the runs that test the empty values say so.
 
 It walks the scenarios a visitor can actually hit:
 
-  inactive landing   the "unavailable" card, in every language, nothing else
+  inactive landing   the "unavailable" card, in every language, nothing else;
+                     no support address -> no mailto and no "write to us"
+  no dev landing     localhost with platform.dev empty -> demo, no request
+  foreign links      rules / policy / login off a TopWin host are not applied
   success + SSO      registration body, then the hidden POST to the casino,
                      and the done screen (with the password) never shown
   email taken        its own message in every language, button usable again
@@ -54,6 +62,22 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Read by the page as TW_CAMPAIGN is assigned: campaign.js's own values stay,
+# the keys given here replace theirs in TW_CAMPAIGN.platform.
+INJECT = '''(() => {
+  const over = %s;
+  let c;
+  Object.defineProperty(window, 'TW_CAMPAIGN', {
+    configurable: true,
+    get() { return c; },
+    set(v) { c = v; if (v) { v.platform = Object.assign(v.platform || {}, over); } }
+  });
+})();'''
+
+NOMAIL = {'ua': 'Реєстрація зараз закрита. Спробуйте пізніше.',
+          'ru': 'Регистрация сейчас закрыта. Попробуйте позже.',
+          'en': 'Registration is closed right now. Please try again later.'}
+
 MESSAGES = {
     'ua': {'exists': 'Цей email уже зареєстровано. Увійдіть в акаунт',
            'recaptcha': 'Не вдалося пройти перевірку безпеки. Спробуйте ще раз',
@@ -88,10 +112,13 @@ def serve():
 class Run:
     """One page in one fresh context, with its own stub state."""
 
-    def __init__(self, browser, base, **state):
+    def __init__(self, browser, base, platform=None, **state):
         self.base = base
         self.state = stubmod.new_state(**state)
         self.ctx = browser.new_context(viewport={'width': 1440, 'height': 900})
+        over = {'dev': stubmod.DEV}
+        over.update(platform or {})
+        self.ctx.add_init_script(INJECT % json.dumps(over))
         stubmod.install(self.ctx, self.state, [base])
         self.page = self.ctx.new_page()
         self.errors = []
@@ -165,10 +192,13 @@ def main():
                 r = Run(browser, base, active=False).open('lang=' + lang)
                 r.page.wait_for_selector('#pl-off[open]', timeout=4000)
                 text = r.page.inner_text('#pl-off-title')
-                mail = r.page.get_attribute('.pl-off__mail', 'href')
+                mails = r.page.locator('.pl-off__mail').count()
+                note = r.page.inner_text('#pl-off .tw-done__note').strip()
                 check('inactive, %s: card shown in that language' % lang,
                       text.lower() == MESSAGES[lang]['off'].lower(), text)
-                check('inactive, %s: mailto support' % lang, mail == 'mailto:support@jack-pot.com', str(mail))
+                check('inactive, %s: no support address -> no mailto' % lang, mails == 0, str(mails))
+                check('inactive, %s: no support address -> no "write to us"' % lang,
+                      note == NOMAIL[lang], note)
                 r.page.keyboard.press('Escape')
                 r.settle(200)
                 check('inactive, %s: Escape does not dismiss it' % lang,
@@ -179,6 +209,42 @@ def main():
                       not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
                 r.close()
 
+            # ── inactive landing with a support address set ──
+            r = Run(browser, base, active=False, platform={'supportEmail': 'help@example.invalid'}).open('lang=en')
+            r.page.wait_for_selector('#pl-off[open]', timeout=4000)
+            mail = r.page.get_attribute('.pl-off__mail', 'href')
+            note = r.page.inner_text('#pl-off .tw-done__note').strip()
+            check('inactive, address set: mailto that address', mail == 'mailto:help@example.invalid', str(mail))
+            check('inactive, address set: the sentence asks to write', note.endswith(':'), note)
+            r.close()
+
+            # ── localhost with no dev landing: the demo path, nothing sent ──
+            r = Run(browser, base, platform={'dev': {'id': None, 'email_registration': '', 'landing': ''}})
+            r.open('lang=en')
+            r.settle()
+            r.fill_and_submit()
+            r.page.wait_for_selector('[data-step="done"]:not([hidden])', timeout=4000)
+            check('no dev landing: demo path, no landing GET, no registration',
+                  not r.state['landing_gets'] and not r.state['registered'],
+                  str(r.state['landing_gets']) + str(r.state['registered']))
+            check('no dev landing: nothing left the page, console clean',
+                  not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
+            r.close()
+
+            # ── links from the landing on a host that is not TopWin's ──
+            r = Run(browser, base, foreign_links=True)
+            warns = []
+            r.page.on('console', lambda m: warns.append(m.text) if m.type == 'warning' else None)
+            r.open('lang=en')
+            r.settle()
+            hrefs = r.page.evaluate("""() => Array.from(document.querySelectorAll('[data-tw-link]'))
+                .map(a => a.getAttribute('href') || '')""")
+            check('foreign links: none of them reaches an anchor',
+                  not any(stubmod.FOREIGN in h for h in hrefs), str(hrefs))
+            check('foreign links: each one skipped with a console warning',
+                  sum('not a TopWin host' in w for w in warns) == 3, str(warns))
+            r.close()
+
             # ── success + SSO ──
             r = Run(browser, base).open('lang=ua&click_id=CLK1&sub1=S1&evil=1')
             r.settle()
@@ -186,7 +252,7 @@ def main():
             r.fill_and_submit()
             r.page.wait_for_function(SSO_DONE, timeout=6000)
             body = r.state['registered'][0] if r.state['registered'] else {}
-            want = {'email': 'player@example.com', 'password': 'Sup3rSecret!', 'landing_id': 8,
+            want = {'email': 'player@example.com', 'password': 'Sup3rSecret!', 'landing_id': stubmod.DEV['id'],
                     'language': 'uk', 'currency': 'UAH', 'country': 'UA', 'promocode': 'PROMO-X',
                     'receivePromos': True, 'clientIp': '203.0.113.7',
                     'g-recaptcha-response': 'STUB-TOKEN:STUB-SITE-KEY:register',

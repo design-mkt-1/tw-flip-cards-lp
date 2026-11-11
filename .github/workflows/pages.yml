@@ -53,6 +53,12 @@ jobs:
           python3 -m pip install --quiet fonttools brotli
           python3 tools/fonts.py --check
 
+      # TopWin and IT's other casino brand are separate projects. No tracked
+      # file may name that brand, its domains or its dev landing
+      # (tw-lp-template, decision 21).
+      - name: No file names the other brand
+        run: python3 tools/brands.py
+
   # fonts reads the files; this one looks at the rendered page. The class of
   # bug it exists for is invisible to every text check: a `display: flex` that
   # was never scoped to [open] left the CLOSED dialog in flow, so the site
@@ -74,7 +80,7 @@ jobs:
           python3 tools/smoke.py
 
       # The IT platform connection, against a stub: not one real request goes to
-      # jack-pot.tech, ipify, Google or Yandex. Reuses the Chromium installed above.
+      # the platform API, ipify, Google or Yandex. Reuses the Chromium installed above.
       - name: The registration must follow the platform's flow, in every language
         run: python3 tools/platform_test.py
 

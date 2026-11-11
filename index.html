@@ -22,8 +22,9 @@
                     and those may need more domains here. Only the console on
                     the first real test shows which.
 
-     connect-src allows the TopWin production API and the Jackpot dev API,
-     used only on localhost / land-crm (campaign.js § platform.dev).
+     connect-src allows the TopWin production API. A TopWin dev landing
+     (campaign.js § platform.dev) does not exist yet; when IT issues one,
+     its API origin is added here.
 
      form-action is still absent, on purpose: the SSO hand-off POSTs to the
      casino's domain, which comes from the API (data.rules) at runtime and is
@@ -40,7 +41,7 @@
      frame-ancestors is absent because browsers ignore it in a meta policy;
      writing it here would only look like protection. -->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://www.googletagmanager.com https://mc.yandex.ru; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com; font-src 'self'; connect-src 'self' https://api2-land-prod.top-win.promo https://api2-land-dev.jack-pot.tech https://api.ipify.org https://www.google.com/recaptcha/ https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com; frame-src https://www.google.com/recaptcha/ https://mc.yandex.ru https://mc.yandex.com; base-uri 'none'; object-src 'none'">
+      content="default-src 'self'; script-src 'self' https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://www.googletagmanager.com https://mc.yandex.ru; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com; font-src 'self'; connect-src 'self' https://api2-land-prod.top-win.promo https://api.ipify.org https://www.google.com/recaptcha/ https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://mc.yandex.ru https://mc.yandex.com; frame-src https://www.google.com/recaptcha/ https://mc.yandex.ru https://mc.yandex.com; base-uri 'none'; object-src 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <!-- Static, because a crawler and a link preview read the head before any

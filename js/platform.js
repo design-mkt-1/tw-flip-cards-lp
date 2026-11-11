@@ -11,14 +11,18 @@
 
    ── The flow ─────────────────────────────────────────────────
    1. config.   Development (localhost, 127.0.0.1, or an origin containing
-                https://land-crm) uses campaign.js § platform.dev, which is IT's
-                TEMP_CONFIG. Everywhere else config.json is fetched from the
+                https://land-crm) uses campaign.js § platform.dev when all three
+                of its values are filled in: a TopWin dev landing that only IT
+                can issue. Until then localhost and 127.0.0.1 take the demo path
+                without a request, and land-crm reads config.json like
+                production. Everywhere else config.json is fetched from the
                 site root: { id, email_registration, landing }.
    2. landing.  GET config.landing -> { data: { active, recaptcha_key, country,
                 currency, promocode, rules, policy, login, redirect_link } }.
                 active false: the "unavailable" card, and nothing else happens.
-                Otherwise the Terms / Privacy / Login links come from the API
-                and reCAPTCHA v3 is loaded with the key the API gave us.
+                Otherwise the Terms / Privacy / Login links come from the API,
+                each only if its host is a TopWin host (isTopWinUrl), and
+                reCAPTCHA v3 is loaded with the key the API gave us.
    3. submit.   reCAPTCHA token, visitor IP, then POST config.email_registration.
    4. success.  response.data.accessToken and response.data.redirectUrl.
                 TopWin returns redirectUrl: the tracker mirror with modal=signIn.
@@ -100,11 +104,40 @@
   var offShown = false;
   var busy = false;
 
+  /* platform.dev counts only with all three values. The template ships it
+     empty: TopWin has no dev landing yet, and another brand's landing must
+     never stand in for one (decision 21 in the topwin-lp skill). */
+  function devConfig() {
+    var d = P.dev;
+    return d && d.id && d.email_registration && d.landing ? d : null;
+  }
+
+  /* A machine of our own, as opposed to IT's land-crm staging host. */
+  function isLocal() {
+    return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  }
+
+  /* The landing API hands us links that go on the page. Only TopWin's own
+     hosts are accepted: a domain whose name starts with topwin or top-win
+     (topwin-bet.club, which the live API returns for landings 12 and 13;
+     top-win.promo) and its subdomains, and the tracker twredirect.com. One
+     TLD only, so topwin.evil.com is refused. Anything else is skipped with a warning,
+     so a wrong landing behind the API cannot send visitors to another brand. */
+  function isTopWinUrl(href) {
+    var u;
+    try { u = new URL(href); } catch (e) { return false; }
+    if (u.protocol !== 'https:') return false;
+    var h = u.hostname.toLowerCase();
+    return /(^|\.)top-?win[a-z0-9-]*\.[a-z]{2,}$/.test(h) ||
+           /(^|\.)twredirect\.com$/.test(h);
+  }
+
   /* Resolves to the config object, or null when there is none to find. Only a
      404 on config.json means "nobody deployed one"; a network failure or a
      malformed file is a fault and rejects. */
   function loadConfig() {
-    if (isDevelopment() && P.dev) return Promise.resolve(P.dev);
+    if (isDevelopment() && devConfig()) return Promise.resolve(devConfig());
+    if (isLocal()) return Promise.resolve(null);   // no TopWin dev landing yet: the demo path
     if (configP) return configP;
     configP = fetch(P.configUrl || 'config.json', { cache: 'no-store' })
       .then(function (r) {
@@ -139,6 +172,7 @@
     var map = { terms: landing.data.rules, privacy: landing.data.policy, login: landing.data.login };
     Object.keys(map).forEach(function (name) {
       if (!map[name]) return;     // keep whatever campaign.js links.* gave it
+      if (!isTopWinUrl(map[name])) return;   // warned once in loadLanding
       Array.prototype.forEach.call(document.querySelectorAll('[data-tw-link="' + name + '"]'), function (a) {
         a.setAttribute('href', withQuery(map[name]));
       });
@@ -173,8 +207,15 @@
         if (!d.active) { showOff(); return 'off'; }
         if (!d.recaptcha_key) throw new Error('landing: no recaptcha_key');
 
+        ['rules', 'policy', 'login'].forEach(function (k) {
+          if (d[k] && !isTopWinUrl(d[k])) {
+            console.warn('[platform] skipped a landing link (' + k + '): not a TopWin host');
+          }
+        });
         var domain = '';
-        try { domain = 'https://' + new URL(d.rules).hostname; } catch (e) { /* no SSO target */ }
+        if (isTopWinUrl(d.rules)) {
+          try { domain = 'https://' + new URL(d.rules).hostname; } catch (e) { /* no SSO target */ }
+        }
         landing = { data: d, config: cfg, domain: domain };
 
         applyLinks();
@@ -261,6 +302,8 @@
     offShown = true;
     if (window.TWForm) TWForm.close();
 
+    /* Empty until IT gives TopWin's support address: then the card has no
+       address and its sentence does not end in "write to us:". */
     var mail = P.supportEmail || '';
     var el = document.createElement('dialog');
     el.className = 'tw-dialog pl-off';
@@ -270,7 +313,7 @@
       '<div class="tw-card">' +
       '<img class="tw-promo__logo" src="' + (C.brand || {}).logo + '" alt="">' +
       '<h2 class="tw-done__title" id="pl-off-title" data-i18n="pl.off.title"></h2>' +
-      '<p class="tw-done__note" data-i18n="pl.off.text"></p>' +
+      '<p class="tw-done__note" data-i18n="' + (mail ? 'pl.off.text' : 'pl.off.textNoMail') + '"></p>' +
       (mail ? '<a class="pl-off__mail" href="mailto:' + mail + '"></a>' : '') +
       '</div>';
     var a = el.querySelector('.pl-off__mail');

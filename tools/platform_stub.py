@@ -1,6 +1,6 @@
 """A stand-in for everything js/platform.js talks to, for the two browser tests.
 
-Not one real request is ever sent to jack-pot.tech, ipify or Google: the
+Not one real request is ever sent to the platform API, ipify or Google: the
 browser is intercepted before the network and every one of those origins is
 answered from here. Any OTHER non-local request is aborted and recorded in
 state['leaks'], so a test can assert the page asked for nothing it should not.
@@ -11,11 +11,21 @@ a missing origin in it shows up as a console error exactly as it would live.
 
 import json
 
-API = 'https://api2-land-dev.jack-pot.tech'
-# The production API. The page reads the same paths from either host.
+# The production API. It is the only platform host in the page's CSP, so the
+# stub answers it; every request to it is intercepted and none reaches it.
 PROD_API = 'https://api2-land-prod.top-win.promo'
-APIS = (API, PROD_API)
-CASINO = 'https://casino.stub.test'
+API = PROD_API
+APIS = (PROD_API,)
+# What the tests put in campaign.js § platform.dev, which ships empty because
+# TopWin has no dev landing yet (decision 21). Injected by platform_test.py.
+DEV = {'id': 7,
+       'email_registration': API + '/api/jp/registration/email',
+       'landing': API + '/api/jp/landing/7'}
+# TopWin-shaped like the live casino host topwin-bet.club (js/platform.js only
+# applies links on a TopWin host), on the reserved .test TLD so it never resolves.
+CASINO = 'https://casino.topwin-bet.test'
+# A host that is not TopWin's: the landing's links on it must be skipped.
+FOREIGN = 'https://casino.example.invalid'
 # The tracker mirror TopWin returns as redirectUrl. Its /api/welcome is answered like the casino's.
 MIRROR = 'https://mirror.example'
 # The analytics hosts js/platform.js loads from the landing response. They are
@@ -50,6 +60,7 @@ def new_state(**over):
         'register_json': {'data': {'accessToken': 'TMP-TOKEN-123'}},
         'redirect_url': None,  # set: the registration answer also carries data.redirectUrl
         'casino_rules': True,  # False: the landing has no rules URL, so there is no casino domain
+        'foreign_links': False,  # True: rules / policy / login point to a host that is not TopWin's
         'register_abort': False,
         'recaptcha_ok': True,
         'ipify_ok': True,
@@ -67,15 +78,16 @@ def new_state(**over):
 
 
 def landing_json(state):
+    casino = FOREIGN if state['foreign_links'] else CASINO
     return {'data': {
         'active': state['active'],
         'recaptcha_key': 'STUB-SITE-KEY',
         'country': 'UA',
         'currency': 'UAH',
         'promocode': 'PROMO-X',
-        'rules': CASINO + '/uk/rules' if state['casino_rules'] else '',
-        'policy': CASINO + '/uk/privacy',
-        'login': CASINO + '/uk/login',
+        'rules': casino + '/uk/rules' if state['casino_rules'] else '',
+        'policy': casino + '/uk/privacy',
+        'login': casino + '/uk/login',
         'redirect_link': 'lobby',
         'analytics_google': state['analytics_google'],
         'analytics_yandex': state['analytics_yandex'],
