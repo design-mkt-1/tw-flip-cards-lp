@@ -9,15 +9,16 @@ project served from a loopback port, and NOT ONE real request -- the platform
 API, ipify and Google are all answered by tools/platform_stub.py, and anything
 else that leaves the page fails the run.
 
-campaign.js ships platform.dev and platform.supportEmail EMPTY (TopWin has no
-dev landing and no known support address yet). Each run injects stubmod.DEV as
+campaign.js ships platform.dev EMPTY (TopWin has no dev landing yet) and
+platform.supportEmail = support@top-win.com. Each run injects stubmod.DEV as
 platform.dev before campaign.js is read, so the flows run as on a configured
 localhost; the runs that test the empty values say so.
 
 It walks the scenarios a visitor can actually hit:
 
   inactive landing   the "unavailable" card, in every language, nothing else;
-                     no support address -> no mailto and no "write to us"
+                     support@top-win.com, a mailto and the full "write to us:"
+                     sentence; an emptied address -> no mailto, no "write to us"
   no dev landing     localhost with platform.dev empty -> demo, no request
   foreign links      rules / policy / login off a TopWin host are not applied
   success + SSO      registration body, then the hidden POST to the casino,
@@ -74,6 +75,10 @@ INJECT = '''(() => {
   });
 })();'''
 
+SUPPORT = 'support@top-win.com'
+WITHMAIL = {'ua': 'Реєстрація зараз закрита. Спробуйте пізніше або напишіть нам:',
+            'ru': 'Регистрация сейчас закрыта. Попробуйте позже или напишите нам:',
+            'en': 'Registration is closed right now. Please try again later or write to us:'}
 NOMAIL = {'ua': 'Реєстрація зараз закрита. Спробуйте пізніше.',
           'ru': 'Регистрация сейчас закрыта. Попробуйте позже.',
           'en': 'Registration is closed right now. Please try again later.'}
@@ -192,13 +197,15 @@ def main():
                 r = Run(browser, base, active=False).open('lang=' + lang)
                 r.page.wait_for_selector('#pl-off[open]', timeout=4000)
                 text = r.page.inner_text('#pl-off-title')
-                mails = r.page.locator('.pl-off__mail').count()
+                mailhref = r.page.get_attribute('.pl-off__mail', 'href')
+                mailtext = r.page.inner_text('.pl-off__mail').strip()
                 note = r.page.inner_text('#pl-off .tw-done__note').strip()
                 check('inactive, %s: card shown in that language' % lang,
                       text.lower() == MESSAGES[lang]['off'].lower(), text)
-                check('inactive, %s: no support address -> no mailto' % lang, mails == 0, str(mails))
-                check('inactive, %s: no support address -> no "write to us"' % lang,
-                      note == NOMAIL[lang], note)
+                check('inactive, %s: mailto:%s, shown as that address' % (lang, SUPPORT),
+                      mailhref == 'mailto:' + SUPPORT and mailtext == SUPPORT, '%s | %s' % (mailhref, mailtext))
+                check('inactive, %s: the full sentence, ending in "write to us:"' % lang,
+                      note == WITHMAIL[lang], note)
                 r.page.keyboard.press('Escape')
                 r.settle(200)
                 check('inactive, %s: Escape does not dismiss it' % lang,
@@ -209,7 +216,17 @@ def main():
                       not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
                 r.close()
 
-            # ── inactive landing with a support address set ──
+            # ── inactive landing with the support address emptied: the fallback ──
+            for lang in ('ua', 'ru', 'en'):
+                r = Run(browser, base, active=False, platform={'supportEmail': ''}).open('lang=' + lang)
+                r.page.wait_for_selector('#pl-off[open]', timeout=4000)
+                mails = r.page.locator('.pl-off__mail').count()
+                note = r.page.inner_text('#pl-off .tw-done__note').strip()
+                check('inactive, %s, empty address: no mailto' % lang, mails == 0, str(mails))
+                check('inactive, %s, empty address: no "write to us"' % lang, note == NOMAIL[lang], note)
+                r.close()
+
+            # ── inactive landing with another support address set ──
             r = Run(browser, base, active=False, platform={'supportEmail': 'help@example.invalid'}).open('lang=en')
             r.page.wait_for_selector('#pl-off[open]', timeout=4000)
             mail = r.page.get_attribute('.pl-off__mail', 'href')

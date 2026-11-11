@@ -302,8 +302,8 @@
     offShown = true;
     if (window.TWForm) TWForm.close();
 
-    /* Empty until IT gives TopWin's support address: then the card has no
-       address and its sentence does not end in "write to us:". */
+    /* TopWin's address is set in campaign.js. If it is emptied, the card has
+       no address and its sentence does not end in "write to us:". */
     var mail = P.supportEmail || '';
     var el = document.createElement('dialog');
     el.className = 'tw-dialog pl-off';

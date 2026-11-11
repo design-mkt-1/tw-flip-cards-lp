@@ -131,8 +131,9 @@ How it works:
 1. `GET config.landing` on every load (`Content-Type` and `Accept:
    application/json`). `data.active` false -> a "temporarily unavailable" card
    in UA / RU / EN, and nothing else works. It shows `platform.supportEmail`
-   from `campaign.js`, which is EMPTY until you give us TopWin's support
-   address; while empty the card carries no address.
+   from `campaign.js`: TopWin's support address is **support@top-win.com**
+   (a mailto link under the sentence "...or write to us:"). If that value is
+   ever emptied, the card carries no address.
    Otherwise the Terms / Privacy / Login links come from `rules` / `policy` /
    `login`, and reCAPTCHA v3 loads with `data.recaptcha_key`.
 2. Submit: reCAPTCHA token (action `register`), the visitor's IP from

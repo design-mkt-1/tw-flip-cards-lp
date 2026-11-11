@@ -117,12 +117,12 @@ window.TW_CAMPAIGN = {
      the demo path (no request) and land-crm reads config.json. Never put
      another brand's landing here (topwin-lp skill, decision 21).
 
-     supportEmail is shown on the "unavailable" card. TopWin's address is
-     not known yet (IT gives it). While it is empty the card shows no address
+     supportEmail is shown on the "unavailable" card: support@top-win.com
+     (owner, 2026-11-11). If it is ever emptied, the card shows no address
      and uses pl.off.textNoMail, a sentence without "write to us". */
   platform: {
     configUrl:    'config.json',
-    supportEmail: '',
+    supportEmail: 'support@top-win.com',
     dev: {
       id: null,
       email_registration: '',

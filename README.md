@@ -132,7 +132,7 @@ email + password only** — the phone tab is removed, because the API is
    `config.example.json`, which the page never reads (see "New LP from this one").
 2. **Landing.** `GET config.landing` on every load. If `data.active` is false
    the page shows a "temporarily unavailable" card (mailto
-   `platform.supportEmail`) in the visitor's language and nothing else works.
+   `platform.supportEmail`, which is support@top-win.com) in the visitor's language and nothing else works.
    Otherwise `data.rules` / `policy` / `login` become the Terms, Privacy and
    Login links (with the page's query string appended), and reCAPTCHA v3 is
    loaded with `data.recaptcha_key`.
