@@ -1,0 +1,29 @@
+.modal__wrap {
+  display: none;
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  padding: 0 20px;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, .5);
+}
+
+.modal__wrap.active {
+  display: flex;
+}
+
+.modal {
+  padding: 60px 40px;
+  max-width: 500px;
+  background-color: #020202;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.modal__text {
+  font-size: 18px;
+  line-height: 120%;
+  font-weight: 700;
+  color: #fff;
+}

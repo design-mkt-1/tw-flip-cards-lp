@@ -82,11 +82,6 @@ var TW_STRINGS = (function () {
       'err.password':       'Пароль занадто короткий',
       'err.network':        'Не вдалося надіслати. Спробуйте ще раз',
 
-      /* The registration result, shown by js/platform.js */
-      'pl.ok.title':        'Вітаємо!',
-      'pl.ok.text':         'Реєстрацію завершено. Ласкаво просимо до кола переможців.',
-      'pl.ok.btn':          'Перейти на сайт',
-      'pl.rc.text':         'На жаль, нам не вдалося підтвердити вашу особу. Спробуйте зареєструватися в іншому браузері або на іншому пристрої.',
 
       'agree.aria':         'Мені 18 років, і я приймаю умови',
       'agree.pre':          'Мені 18 років, і я приймаю ',
@@ -144,11 +139,6 @@ var TW_STRINGS = (function () {
       'err.password':       'Пароль слишком короткий',
       'err.network':        'Не удалось отправить. Попробуйте ещё раз',
 
-      /* The registration result, shown by js/platform.js */
-      'pl.ok.title':        'Поздравляем!',
-      'pl.ok.text':         'Регистрация завершена. Добро пожаловать в круг победителей.',
-      'pl.ok.btn':          'Перейти на сайт',
-      'pl.rc.text':         'К сожалению, нам не удалось подтвердить вашу личность. Попробуйте зарегистрироваться в другом браузере или на другом устройстве.',
 
       'agree.aria':         'Мне 18 лет, и я принимаю условия',
       'agree.pre':          'Мне 18 лет, и я принимаю ',
@@ -201,11 +191,6 @@ var TW_STRINGS = (function () {
       'err.password':       'Password is too short',
       'err.network':        'Could not send. Please try again',
 
-      /* The registration result, shown by js/platform.js */
-      'pl.ok.title':        'Congratulations!',
-      'pl.ok.text':         'Your registration is complete. Welcome to the winners\' circle.',
-      'pl.ok.btn':          'Go to the site',
-      'pl.rc.text':         'Unfortunately, we were unable to verify your identity. Please try registering using a different browser or device.',
 
       'agree.aria':         'I am 18 and I accept the terms',
       'agree.pre':          'I am 18 years old and I accept the ',

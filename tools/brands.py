@@ -13,10 +13,10 @@ excluded) and fails on the other brand's name in any spelling, its domains,
 or the name of its dev landing, case-insensitive. The patterns are assembled
 from pieces below so that this file does not match itself.
 
-One exception, decision 24 (owner, 2026-11-12): TopWin and the other brand
-share one platform and database, and campaign.js `platform.dev` carries IT's
-own TEMP_CONFIG. The guard removes exactly three strings from campaign.js
-before it looks: the dev host and the two dev URLs listed in ALLOWED_IN_CAMPAIGN.
+One exception, decisions 24 and 25 (owner, 2026-11-12): TopWin and the other brand
+share one platform and database, and IT's own `_js/enums/enums.js`, copied verbatim to
+js/it/enums/enums.js, carries their TEMP_CONFIG. The guard removes exactly two strings
+from that one file before it looks: the two dev URLs listed in ALLOWED_IN_IT.
 Nothing else is allowed, there or anywhere: the other brand's support address,
 its casino domain, a different path on the dev host, or the dev host in any
 other file all still fail.
@@ -42,22 +42,22 @@ _NAME = "jack" + r"[-_ .]?" + "pot"
 _LANDING = "land" + "330"
 PATTERN = re.compile("|".join([_NAME, _LANDING]), re.IGNORECASE)
 
-# The only text the other brand's name may appear in (decision 24), and only in
-# campaign.js: the dev host with exactly one of the two dev paths, each up to
+# The only text the other brand's name may appear in (decisions 24, 25), and only in
+# js/it/enums/enums.js: the dev host with exactly one of the two dev paths, each up to
 # and including the closing quote, so a longer path or another host fails.
 # Assembled from pieces for the same reason as the pattern.
 _DEV_HOST = "https://api2-land-dev." + "jack" + "-" + "pot" + ".tech"
-ALLOWED_IN_CAMPAIGN = [
-    _DEV_HOST + "/api/jp/registration/email'",
-    _DEV_HOST + "/api/jp/landing/8'",
+ALLOWED_IN_IT = [
+    _DEV_HOST + "/api/jp/registration/email\"",
+    _DEV_HOST + "/api/jp/landing/8\"",
 ]
-CAMPAIGN = "campaign.js"
+IT_ENUMS = "js/it/enums/enums.js"
 
 
 def scrub(rel: str, line: str) -> str:
-    """The line with the exact allowed dev URLs removed, for campaign.js only."""
-    if rel == CAMPAIGN:
-        for ok in ALLOWED_IN_CAMPAIGN:
+    """The line with the exact allowed dev URLs removed, for IT's enums.js only."""
+    if rel == IT_ENUMS:
+        for ok in ALLOWED_IN_IT:
             line = line.replace(ok, "")
     return line
 

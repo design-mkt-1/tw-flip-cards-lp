@@ -113,7 +113,7 @@ def preview_image(files):
     so the shot shows what IT's server will show -- and a file missing from the
     allowlist is missing from the picture. Anything that is not loopback is
     aborted: no request reaches IT's API, ipify or Google. With no config.json
-    the page runs its demo path on localhost, as tools/smoke.py relies on.
+    IT's main.js asks its dev API on localhost and the abort is only a console line.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -236,55 +236,48 @@ cosmetic one.
 
 ## 3. The platform connection -- WHAT WE NEED FROM YOU
 
-`js/platform.js` is your template's connection (your `_js/main.js`), step for
-step: the same requests, headers, order and body. The form is **email +
-password only**: the phone tab is removed because the API is
-`registration/email`.
+The registration is **your own template's code, copied 1:1** (decision 25):
+`js/it/main.js` and the files it imports are your `_js/` files from
+`test6637.zip`; `index.html` loads them and FingerprintJS 3.3.3 the way yours
+does. The form is **email and password only**; the phone tab is removed because
+the API is registration/email. `js/platform.js` only gives your `main.js` the
+elements it looks for on our pop-up. The one change in your text is the support
+address in the "page disabled" modal: **support@top-win.com**.
 
-How it works:
+Your flow, as your `main.js` runs it:
 
 1. `config.json` (below), then `GET config.landing` with `Content-Type` and
-   `Accept: application/json`. Analytics come from the landing response.
-   `data.active` false -> a "temporarily unavailable" card in UA / RU / EN,
-   and nothing else works. It shows `platform.supportEmail` from
-   `campaign.js`: TopWin's support address is **support@top-win.com** (a
-   mailto link under the sentence "...or write to us:"). If that value is
-   ever emptied, the card carries no address.
-   Otherwise reCAPTCHA v3 loads (`api.js?render=<recaptcha_key>`) and the
-   Terms / Privacy / Login links are set to `rules` / `policy` / `login` as
-   your API returns them, with the page's query string appended, as your
-   template does (no host filter).
+   `Accept: application/json`. Analytics come from the landing response
+   (`js/it/analytics.js`, yours). `data.active` false -> your "Page disabled"
+   modal with `support@top-win.com`, and nothing else works. Otherwise
+   reCAPTCHA v3 loads (`api.js?render=<recaptcha_key>`) and the Terms / Privacy
+   / Login links are set to `rules` / `policy` / `login` as your API returns
+   them, with the page's query string appended.
 2. `GET https://api.ipify.org?format=json` once at page load; the IP is kept.
-3. Submit: `grecaptcha.execute(recaptcha_key, {{action: "register"}})`, then
-   `POST config.email_registration` with `Content-Type: application/json`:
+3. Submit: your validation (your English texts), `grecaptcha.execute(
+   recaptcha_key, {{action: "register"}})`, then `POST config.email_registration`
+   with `Content-Type: application/json`:
 
        {{ email, password, landing_id, language, currency, country, promocode,
          receivePromos: true, clientIp, ...every URL parameter,
          "g-recaptcha-response" }}
 
-   exactly as your template builds it: every parameter on the page URL is
-   spread LAST, so one named like a field overwrites it, as on your page.
-   `language` is the active language button lowercased, as in your template:
-   `ua`, `ru` or `en`.
-4. Success -- as in your template: `response.data.accessToken` is read
-   (`redirectUrl` is not). A success modal opens, in TopWin's style, in
-   ua / ru / en. When the visitor clicks its button, the token is POSTed to
-   `<casino>/api/welcome` as `tmpToken`, with `redirect=<casino>/<lang>/
-   <redirect_link>?<page query>`, where `<casino>` is the host of
-   `data.rules`. The confirmation screen that shows a login and a password is
-   never shown.
-5. Errors: `{{ errors: [msg] }}`. "already registered" gets its own translated
-   message; anything mentioning reCAPTCHA gets its own translated message and
-   a separate modal; everything else is the generic "could not send". The
-   server's own text is never shown.
+   `language` is the active language button lowercased: `ua`, `ru` or `en`.
+4. Success: `response.data.accessToken`; your success modal opens (your text,
+   your icon); its button submits `#sso` to `<casino>/api/welcome` with
+   `tmpToken` and `redirect=<casino>/<lang>/<redirect_link>?<page query>`,
+   where `<casino>` is the host of `data.rules`.
+5. Errors: `{{ errors: [msg] }}`. The server's text is shown as it comes in the
+   email error; exactly "reCAPTCHA verification failed. Please try again."
+   also opens your error modal.
 
-**Development.** On localhost, 127.0.0.1 or `https://land-crm...` it uses
-`campaign.js` -> `platform.dev`, which holds your template's own TEMP_CONFIG
-(landing id 8 and its two URLs). A real TopWin dev landing replaces it when
-you issue one. Emptied, localhost runs the demo path and land-crm reads
-`config.json`.
+**Development.** On localhost, 127.0.0.1 or `https://land-crm...` your
+`TEMP_CONFIG` (landing id 8 and its two URLs, in `js/it/enums/enums.js`) is
+used, one second after load, as in your `main.js`. It never reaches a visitor
+on the live domain.
 
-**Production.** The page fetches `config.json` from the site root:
+**Production.** The page fetches `config.json` from next to `index.html` (in
+the same folder as the page):
 
     {{ "id": 12,
       "email_registration": "https://<api host>/api/jp/registration/email",
@@ -293,9 +286,9 @@ you issue one. Emptied, localhost runs the demo path and land-crm reads
 **Our landing is 12 on `api2-land-prod.top-win.promo`.** It runs live at
 https://landings.top-win.promo/testnewland1243/.
 
-**WITHOUT `config.json` THE PAGE IS NOT CONNECTED.** It still looks finished:
-the form validates, writes a warning to the browser console and shows the demo
-confirmation screen. Check the console on the first deploy.
+**WITHOUT `config.json` THE PAGE DOES NOTHING**, exactly like your template: it
+logs `Error to get config` to the browser console and the form does not submit.
+Check the console on the first deploy.
 
 ### What you have to supply or change
 
@@ -316,8 +309,8 @@ confirmation screen. Check the console on the first deploy.
    - the casino site has `/ua/`, `/ru/` and `/en/` routes for the fallback
      redirect, and what `redirect_link` should be;
    - which SSO hand-off is right (step 4);
-   - whether the registration error texts are stable English strings: we match
-     "already registered" and "recaptcha" loosely, anything else is generic;
+   - that the registration error text for reCAPTCHA stays exactly
+     "reCAPTCHA verification failed. Please try again." (your template matches it);
    - that `status.json` in your zip is read by your infrastructure, not by the
      page: nothing here references it.
 5. **The reCAPTCHA v3 badge is hidden** (`.grecaptcha-badge` in `css/styles.css`),
@@ -345,7 +338,7 @@ with the same id attached. If your redirect drops these, the attribution is
 lost here and nowhere else.
 
 GA, Yandex Metrika and GTM load from the landing API response, as in your
-landing: `js/platform.js` injects them. Invalid IDs are skipped with a
+landing: IT's `js/it/analytics.js` injects them. Invalid IDs are skipped with a
 console warning.
 `analytics.gtmId` / `analytics.metaPixelId` in campaign.js are still read by
 the shared template's `js/shell.js`, so they are a second, separate GTM and

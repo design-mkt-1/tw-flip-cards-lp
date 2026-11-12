@@ -577,6 +577,10 @@
   color: var(--green-on-light);
   font-weight: var(--fw-semi);
   text-decoration: underline;
+  /* v1.0.22: a link that wraps leaves its last word alone on a line, 22px wide
+     ("Use" of "Terms of Use" on a 375px screen) -- under the 24px target of
+     decision 18. It is only measured once the platform has given it an href. */
+  white-space: nowrap;
 }
 
 

@@ -1,39 +1,41 @@
-"""A stand-in for everything js/platform.js talks to, for the two browser tests.
+"""A stand-in for everything IT's registration code (js/it/) talks to, for the
+two browser tests.
 
-Not one real request is ever sent to the platform API, ipify or Google: the
-browser is intercepted before the network and every one of those origins is
-answered from here. Any OTHER non-local request is aborted and recorded in
-state['leaks'], so a test can assert the page asked for nothing it should not.
+Not one real request is ever sent to the platform API, ipify, Google or the
+fingerprint CDN: the browser is intercepted before the network and every one of
+those is answered from here. Any OTHER non-local request is aborted and
+recorded in state['leaks'], so a test can assert the page asked for nothing it
+should not.
 
-index.html has no CSP (IT's template has none, owner 2026-11-11), so nothing
-is refused by the browser before interception.
+The API is matched by PATH (/api/jp/landing/<id>, /api/jp/registration/email),
+on any host. IT's own dev host sits in js/it/enums/enums.js and is the only
+place tools/brands.py lets it be named, so it is not named here: whichever host
+a page is configured with, the stub answers it.
+
+Two ways to open the page:
+  * http://127.0.0.1:<port>/   IT's development branch (TEMP_CONFIG, landing 8,
+                               main.js starts one second late)
+  * SITE (http://lp.test/)     a production-like origin: the files come from
+                               disk through the stub, config.json comes from
+                               state['config'] (404 when it is None), and
+                               main.js starts at once
 """
 
 import json
+import mimetypes
+from pathlib import Path
 
-# The production API. The stub answers it; every request to it is
-# intercepted and none reaches it.
-PROD_API = 'https://api2-land-prod.top-win.promo'
-API = PROD_API
-APIS = (PROD_API,)
-# What the tests put in campaign.js § platform.dev, which ships IT's own dev
-# config (decision 24), a real host. Injected by platform_test.py and smoke.py
-# so the page never calls it.
-DEV = {'id': 7,
-       'email_registration': API + '/api/jp/registration/email',
-       'landing': API + '/api/jp/landing/7'}
-# Shaped like the live casino host topwin-bet.club, on the reserved .test TLD
-# so it never resolves.
+ROOT = Path(__file__).resolve().parent.parent
+
+# The production API host of config.example.json: never reached, always answered.
+API = 'https://api2-land-prod.top-win.promo'
+# A production-like origin that does not resolve; the stub serves it from ROOT.
+SITE = 'http://lp.test'
+# Shaped like the live casino host topwin-bet.club, on the reserved .test TLD.
 CASINO = 'https://casino.topwin-bet.test'
-# A host that is not TopWin's. Since 2026-11-11 the page applies the landing's
-# links as IT's template does, with no host filter, so these are applied too.
-FOREIGN = 'https://casino.example.invalid'
-# A mirror the registration answer may carry as redirectUrl. The page ignores it
-# (decision 24); its /api/welcome is answered so a test can prove nothing is posted there.
-MIRROR = 'https://mirror.example'
-# The analytics hosts js/platform.js loads from the landing response. They are
-# answered with an empty script, so nothing reaches Google or Yandex.
-ANALYTICS = (
+# The analytics and fingerprint hosts. Answered with an empty script.
+FINGERPRINT = 'https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3.3.3/'
+EMPTY_SCRIPT_HOSTS = (
     'https://www.googletagmanager.com/',
     'https://www.google-analytics.com/',
     'https://mc.yandex.ru/',
@@ -58,42 +60,42 @@ window.grecaptcha = {
 def new_state(**over):
     state = {
         'active': True,
-        'landing_delay': 0,
         'register_status': 200,
         'register_json': {'data': {'accessToken': 'TMP-TOKEN-123'}},
-        'redirect_url': None,  # set: the registration answer also carries data.redirectUrl
-        'casino_rules': True,  # False: the landing has no rules URL, so there is no casino domain
-        'foreign_links': False,  # True: rules / policy / login point to a host that is not TopWin's
+        'casino_rules': True,   # False: the landing has no rules URL
         'register_abort': False,
         'recaptcha_ok': True,
         'ipify_ok': True,
-        'registered': [],     # parsed JSON bodies sent to the registration API
-        'register_raw': [],   # {headers, body, method}: the request exactly as sent
-        'order': [],          # 'landing' | 'recaptcha_js' | 'ipify' | 'register', in arrival order
-        'recaptcha_src': [],  # every api.js URL the page asked for
-        'sso': [],            # {url, body} of every POST to the casino
-        'landing_gets': [],   # headers of every GET landing
-        'leaks': [],          # anything else that left the page
-        'analytics_google': None,   # IDs the landing response carries; None = absent
+        'config': None,         # SITE only: the config.json body; None = 404
+        'registered': [],       # parsed JSON bodies sent to the registration API
+        'register_raw': [],     # {headers, body, method}: the request as sent
+        'landing_urls': [],     # every GET landing URL
+        'register_urls': [],    # every POST registration URL
+        'order': [],            # 'config' | 'landing' | 'recaptcha_js' | 'ipify' | 'register'
+        'recaptcha_src': [],    # every api.js URL the page asked for
+        'sso': [],              # {url, body, method} of every POST to the casino
+        'landing_gets': [],     # headers of every GET landing
+        'fingerprint': [],      # every request to the fingerprint CDN
+        'leaks': [],            # anything else that left the page
+        'analytics_google': None,
         'analytics_yandex': None,
         'gtm_tag': None,
-        'analytics_requests': [],   # every URL answered by the analytics stub
+        'analytics_requests': [],
     }
     state.update(over)
     return state
 
 
 def landing_json(state):
-    casino = FOREIGN if state['foreign_links'] else CASINO
     return {'data': {
         'active': state['active'],
         'recaptcha_key': 'STUB-SITE-KEY',
         'country': 'UA',
         'currency': 'UAH',
         'promocode': 'PROMO-X',
-        'rules': casino + '/uk/rules' if state['casino_rules'] else '',
-        'policy': casino + '/uk/privacy',
-        'login': casino + '/uk/login',
+        'rules': CASINO + '/uk/rules' if state['casino_rules'] else '',
+        'policy': CASINO + '/uk/privacy',
+        'login': CASINO + '/uk/login',
         'redirect_link': 'lobby',
         'analytics_google': state['analytics_google'],
         'analytics_yandex': state['analytics_yandex'],
@@ -108,32 +110,46 @@ def install(context, state, local_prefixes):
     def handler(route):
         req = route.request
         url = req.url
+        path = url.split('?', 1)[0]
 
         if any(url.startswith(p) for p in local_prefixes):
             return route.continue_()
 
+        if url.startswith(SITE + '/'):
+            rel = path[len(SITE) + 1:] or 'index.html'
+            if rel == 'config.json':
+                state['order'].append('config')
+                if state['config'] is None:
+                    return route.fulfill(status=404, body='not found')
+                return route.fulfill(status=200, headers=CORS, content_type='application/json',
+                                     body=json.dumps(state['config']))
+            f = ROOT / rel
+            if not f.is_file() or ROOT not in f.resolve().parents:
+                return route.fulfill(status=404, body='not found')
+            return route.fulfill(status=200, body=f.read_bytes(),
+                                 content_type=mimetypes.guess_type(f.name)[0] or 'application/octet-stream')
+
         if req.method == 'OPTIONS':
             return route.fulfill(status=204, headers=CORS)
 
-        if any(url.startswith(a + '/api/jp/landing/') for a in APIS):
+        if '/api/jp/landing/' in path:
             state['landing_gets'].append(dict(req.headers, method=req.method))
+            state['landing_urls'].append(url)
             state['order'].append('landing')
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body=json.dumps(landing_json(state)))
 
-        if any(url.startswith(a + '/api/jp/registration/email') for a in APIS):
+        if path.endswith('/api/jp/registration/email'):
             if state['register_abort']:
                 return route.abort()
             state['registered'].append(json.loads(req.post_data or '{}'))
             state['register_raw'].append({'headers': req.headers, 'body': req.post_data or '',
                                           'method': req.method})
+            state['register_urls'].append(url)
             state['order'].append('register')
-            payload = state['register_json']
-            if state['redirect_url']:
-                payload = {'data': dict(payload['data'], redirectUrl=state['redirect_url'])}
             return route.fulfill(status=state['register_status'], headers=CORS,
                                  content_type='application/json',
-                                 body=json.dumps(payload))
+                                 body=json.dumps(state['register_json']))
 
         if url.startswith('https://www.google.com/recaptcha/api.js'):
             state['recaptcha_src'].append(url)
@@ -150,13 +166,17 @@ def install(context, state, local_prefixes):
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body='{"ip":"203.0.113.7"}')
 
-        if url.startswith(CASINO + '/api/welcome') or url.startswith(MIRROR + '/api/welcome'):
+        if url.startswith(CASINO + '/api/welcome'):
             state['sso'].append({'url': url, 'body': req.post_data or '',
                                  'method': req.method})
             return route.fulfill(status=200, content_type='text/html',
                                  body='<!doctype html><title>casino stub</title>')
 
-        if any(url.startswith(p) for p in ANALYTICS):
+        if url.startswith(FINGERPRINT):
+            state['fingerprint'].append(url)
+            return route.fulfill(status=200, content_type='application/javascript', body='')
+
+        if any(url.startswith(p) for p in EMPTY_SCRIPT_HOSTS):
             state['analytics_requests'].append(url)
             return route.fulfill(status=200, content_type='application/javascript', body='')
 

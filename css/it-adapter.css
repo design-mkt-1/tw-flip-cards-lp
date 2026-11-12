@@ -1,0 +1,32 @@
+/* Ours, not IT's: what IT's registration code (js/it/main.js) needs from the
+   pop-up's own styling, decision 25. Everything IT styles itself is in css/it/
+   as IT shipped it (success-modal.css, reg-modal-error.css, disabled-modal.css);
+   this file holds the rest.
+
+   .field-error is IT's block (css/components/form-modal.css of test6637.zip),
+   the same declarations, with the red taken from the token file. main.js adds
+   and removes ".active" on it and writes the message into its <span>.
+   The .valid / error rules below do on our field box what IT's CSS does on
+   its own: green border and tick when main.js sets ".valid", red border while
+   the message under it is active. */
+
+.field-error {
+  align-items: flex-start;
+  gap: 4px;
+  display: none;
+  margin: 4px 0 0;
+}
+
+.field-error.active { display: flex; }
+.field-error img { display: none; }
+.field-error span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--danger);
+}
+
+.tw-field.valid .tw-ok    { display: grid; }
+.tw-field.valid .tw-input { border-color: var(--green); }
+
+.tw-field:has(+ .field-error.active) .tw-input { border-color: var(--danger); }
+.tw-field:has(+ .field-error.active) .tw-ok    { display: none; }

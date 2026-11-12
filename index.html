@@ -62,6 +62,11 @@
 <link rel="stylesheet" href="css/shell.css">
 <link rel="stylesheet" href="css/form.css">
 <link rel="stylesheet" href="css/styles.css">
+<!-- IT's registration (decision 25): their modal styles as shipped, then our adapter. -->
+<link rel="stylesheet" href="css/it/success-modal.css">
+<link rel="stylesheet" href="css/it/reg-modal-error.css">
+<link rel="stylesheet" href="css/it/disabled-modal.css">
+<link rel="stylesheet" href="css/it-adapter.css">
 <noscript><style>.fc-claim { display: block; }</style></noscript>
 </head>
 <body>
@@ -130,6 +135,54 @@
 
 <div data-tw="footer"></div>
 
+<!-- ═══ IT's modals and SSO form (decision 25) ═══════════════════
+     IT's markup from test6637.zip index.html, with their texts. Their lang.js
+     fills data-text from LANG_TEXTS.EN; here the same English text is written
+     in place, on all three languages, nothing translated. Their stylesheet is
+     css/it/. main.js switches them on with the class "active". The mail link
+     in the last one is set by main.js to support@top-win.com. -->
+
+<form id="sso" action="" method="POST" enctype="application/x-www-form-urlencoded">
+    <input type="hidden" name="tmpToken" value="" id="sso-tmpToken">
+    <input type="hidden" name="redirect" value="" id="sso-redirect">
+</form>
+
+<div class="modal__wrap">
+    <div class="modal">
+        <p data-text="modalErrorText" class="modal__text">Unfortunately, we were unable to verify your identity. Please try registering using a different browser or device.</p>
+    </div>
+</div>
+
+<div class="success-modal">
+    <div class="success-modal__card">
+        <img src="assets/img/it/logo.svg" alt="Top Win" class="success-modal__logo">
+        <div class="success-modal__icon">
+            <div class="success-modal__icon-inner">
+                <img src="assets/img/it/check-success.svg" alt="">
+            </div>
+        </div>
+        <h2 class="success-modal__title" data-text="successTitle">Congratulations!</h2>
+        <p class="success-modal__text" data-text="successText">Your registration is complete. Welcome to the winners' circle.</p>
+        <button type="button" class="success-modal__btn" data-text="successBtn">Go to the site</button>
+    </div>
+</div>
+
+<div class="disabled-modal">
+    <div class="modal-content">
+        <div class="title-content">
+            <h2>Page disabled</h2>
+            <span>The page you are looking for appears to be disabled</span>
+            <p>Do you have any questions?</p>
+        </div>
+        <div class="socials">
+            <div class="social-item">
+                <img src="assets/img/it/mail.svg" alt="mail">
+                <a target="_blank" href="#" class="mail-link"></a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- defer, and the order IS the dependency graph: there is no bundler and no
      import anywhere in this repo. The five middle files are tw-lp-template's
      and are never edited here; campaign.js configures them and js/flip.js is
@@ -141,6 +194,11 @@
 <script src="js/form.js" defer></script>
 <script src="js/shell.js" defer></script>
 <script src="js/platform.js" defer></script>
+<!-- IT's registration, 1:1 (decision 25). FingerprintJS exactly as IT's
+     index.html loads it (a plain script, before main.js). main.js is a module:
+     it runs after the deferred scripts above it, in document order. -->
+<script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3.3.3/dist/fp.min.js"></script>
+<script type="module" src="js/it/main.js"></script>
 <script src="js/flip.js" defer></script>
 </body>
 </html>

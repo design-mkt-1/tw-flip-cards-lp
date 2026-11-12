@@ -98,18 +98,6 @@ PAGE = 'index.html'
 VIEWPORTS = (('desktop', 1440, 900), ('mobile', 375, 812))
 
 
-# Empties campaign.js platform.dev as TW_CAMPAIGN is assigned (see platform_test.py).
-DEMO_DEV = '''(() => {
-  let c;
-  Object.defineProperty(window, 'TW_CAMPAIGN', {
-    configurable: true,
-    get() { return c; },
-    set(v) { c = v; if (v) { v.platform = Object.assign(v.platform || {},
-      {dev: {id: null, email_registration: '', landing: ''}}); } }
-  });
-})();'''
-
-
 def languages():
     """The campaign's own list, read out of campaign.js without running it.
 
@@ -369,15 +357,13 @@ def main():
         try:
             for name, width, height in VIEWPORTS:
                 context = browser.new_context(viewport={'width': width, 'height': height})
-                # js/platform.js asks the IT API for the landing on every load
+                # js/it/main.js asks the IT API for the landing on every load
                 # (127.0.0.1 counts as development). That must never be a real
                 # request, from CI or from a laptop: it is answered from here,
                 # and anything else that leaves the page is aborted and fails
                 # the run below.
-                # campaign.js ships IT's TEMP_CONFIG as platform.dev (decision 24),
-                # a real host: emptied here, so the page takes the demo path with
-                # no request at all, and the stub catches anything that leaves.
-                context.add_init_script(DEMO_DEV)
+                # IT's js/it/main.js (decision 25) fetches its TEMP_CONFIG landing on
+                # 127.0.0.1; the stub answers it, anything else that leaves fails.
                 stub = platform_stub.new_state()
                 platform_stub.install(context, stub, [base])
                 page = context.new_page()

@@ -79,24 +79,20 @@ window.TW_CAMPAIGN = {
   },
 
   /* ── The registration form ────────────────────────────────────
-     endpoint '' means nothing is sent: the validated payload goes to
-     console.info and, with demoDone true, the confirmation screen is walked
-     anyway. IT sets `endpoint` and the form POSTs JSON to it; a response
-     carrying { login, password } fills the confirmation screen.
-     `onRegister(payload)` is the escape hatch and overrides `endpoint`.
+     IT's registration and connection run 1:1 (decision 25): js/it/main.js is
+     IT's _js/main.js, copied, and it owns validation, the POST, the success
+     modal and the errors. `external: true` tells js/form.js to bind none of
+     its own submit, validation, show-password and consent handlers, so the two
+     do not fight. js/platform.js only gives IT's code the DOM it looks for.
+     `endpoint`, `hiddenFields` and `demoDone` are therefore not used on this
+     landing: IT's body has no such thing. They stay for a landing that is NOT
+     on the platform (set `external` to false there).
 
-     The payload carries the password, so `endpoint` must be the operator's
-     own TLS endpoint and nowhere else. */
+     The password is in the request body, so config.json's
+     email_registration must be the operator's own TLS endpoint. */
   form: {
+    external:     true,
     endpoint:     '',
-    /* js/platform.js owns the registration: config, landing, reCAPTCHA, the
-       POST and the SSO redirect. It overrides `endpoint`, which stays empty. */
-    onRegister:   function (payload) { return window.TWPlatform.register(payload); },
-    /* landing_id is NOT here any more: the platform's numeric id comes from
-       config.json, and a string of ours would only compete with it. Nothing
-       put here reaches IT: js/platform.js builds IT's body exactly as IT's
-       template does, and IT's template has no hidden fields (owner,
-       2026-11-11). Only the endpoint path off the platform reads this. */
     hiddenFields: {},
     demoDone:     true,
     dialCode:     '+380',
@@ -105,36 +101,14 @@ window.TW_CAMPAIGN = {
     passwordMin:  8
   },
 
-  /* ── The IT platform (js/platform.js) ─────────────────────────
-     In production the page reads `configUrl` from its own root:
-       { "id": <number>, "email_registration": "<url>", "landing": "<url>" }
-     Without that file the page is NOT connected: the form walks the demo
-     confirmation screen and says so in the console.
-
-     `dev` is IT's own TEMP_CONFIG from their reference landing
-     (_js/enums/enums.js), copied verbatim (owner, 2026-11-12, decision 24).
-     TopWin and the other brand on this platform share one platform and one
-     database, so a registration made on localhost lands in landing 8 there;
-     the owner accepts that. It is used ONLY on localhost, 127.0.0.1 or an
-     origin containing https://land-crm, exactly the hosts IT's main.js uses,
-     and only when all three values are set. Empty them and localhost runs
-     the demo path (no request) and land-crm reads config.json. tools/brands.py
-     allows exactly these values and nothing else of the other brand. A real
-     TopWin dev landing, when IT issues one, replaces them.
-
-     supportEmail is shown on the "unavailable" card: support@top-win.com
-     (owner, 2026-11-11, decision 21, confirmed 2026-11-12, decision 24). If it
-     is ever emptied, the card shows no address and uses pl.off.textNoMail, a
-     sentence without "write to us". */
-  platform: {
-    configUrl:    'config.json',
-    supportEmail: 'support@top-win.com',
-    dev: {
-      id: 8,
-      email_registration: 'https://api2-land-dev.jack-pot.tech/api/jp/registration/email',
-      landing:            'https://api2-land-dev.jack-pot.tech/api/jp/landing/8'
-    }
-  },
+  /* ── The IT platform ──────────────────────────────────────────
+     Nothing to set here. js/it/main.js reads config.json from next to
+     index.html (one file per landing, written on the server, never committed),
+     and on localhost / 127.0.0.1 / an origin containing https://land-crm it
+     uses IT's own TEMP_CONFIG, which sits in js/it/enums/enums.js, copied
+     verbatim (decisions 24 and 25). The "unavailable" card shows
+     support@top-win.com, the one place the copy differs from IT's file
+     (owner, decision 25). */
 
   /* ── Languages ────────────────────────────────────────────────
      All three, in header-menu order, and ONE HTML file for all of them.
@@ -206,11 +180,6 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни картки',
       'hero.2':          'забери свій бонус!',
       'game.label':      'Переверніть три картки та заберіть вітальний бонус',
-      'pl.off.title':   'Сторінка тимчасово недоступна',
-      'pl.off.text':    'Реєстрація зараз закрита. Спробуйте пізніше або напишіть нам:',
-      'pl.off.textNoMail': 'Реєстрація зараз закрита. Спробуйте пізніше.',
-      'err.exists':     'Цей email уже зареєстровано. Увійдіть в акаунт',
-      'err.recaptcha':  'Не вдалося пройти перевірку безпеки. Спробуйте ще раз',
       'cta.claim':       'Забрати бонус'
     },
     ru: {
@@ -220,11 +189,6 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Переверни карты',
       'hero.2':          'забери свой бонус!',
       'game.label':      'Переверните три карты и заберите приветственный бонус',
-      'pl.off.title':   'Страница временно недоступна',
-      'pl.off.text':    'Регистрация сейчас закрыта. Попробуйте позже или напишите нам:',
-      'pl.off.textNoMail': 'Регистрация сейчас закрыта. Попробуйте позже.',
-      'err.exists':     'Этот email уже зарегистрирован. Войдите в аккаунт',
-      'err.recaptcha':  'Не удалось пройти проверку безопасности. Попробуйте ещё раз',
       'cta.claim':       'Забрать бонус'
     },
     en: {
@@ -234,11 +198,6 @@ window.TW_CAMPAIGN = {
       'hero.1':          'Flip the cards',
       'hero.2':          'claim your bonus!',
       'game.label':      'Turn three cards and claim your welcome bonus',
-      'pl.off.title':   'This page is temporarily unavailable',
-      'pl.off.text':    'Registration is closed right now. Please try again later or write to us:',
-      'pl.off.textNoMail': 'Registration is closed right now. Please try again later.',
-      'err.exists':     'This email is already registered. Please log in',
-      'err.recaptcha':  'The security check failed. Please try again',
       'cta.claim':       'Claim bonus'
     }
   }

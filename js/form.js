@@ -40,6 +40,13 @@
   var PHONE_PREFIX = F.dialCode || '+380';
   var PASSWORD_MIN = F.passwordMin || 8;
 
+  /* form.external (v1.0.22): something outside this file owns validation, the
+     show-password button, the consent box and the submit -- IT's _js/main.js
+     on a landing that runs it 1:1 (decision 25). mount() then binds none of
+     them, so the two sets of handlers never fight over the same button. Tabs,
+     close, copy and the dialog's own events stay. Default false: unchanged. */
+  var EXTERNAL = !!F.external;
+
   var EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 
   var dialog, form, stepForm, stepDone;
@@ -335,37 +342,39 @@
       tab.addEventListener('click', function () { setMode(tab.getAttribute('data-mode')); });
     });
 
-    ['email', 'phone', 'password'].forEach(function (name) {
-      var input = $('input', field(name));
-      input.addEventListener('input', function () { live(name); });
-      input.addEventListener('blur', function () { grade(name); });
-    });
+    if (!EXTERNAL) {
+      ['email', 'phone', 'password'].forEach(function (name) {
+        var input = $('input', field(name));
+        input.addEventListener('input', function () { live(name); });
+        input.addEventListener('blur', function () { grade(name); });
+      });
 
-    /* The field accepts the number in three shapes and the validator
-       normalises all three, but the box still showed what was typed -- so a
-       visitor who pasted 380931234567 read "+380 380931234567" and could not
-       tell whether it had been understood. Written back on blur, once the
-       number is complete, so nothing is rewritten mid-typing. */
-    $('#tw-phone').addEventListener('blur', function () {
-      var digits = phoneDigits();
-      if (digits.length === PHONE_DIGITS) this.value = digits;
-    });
+      /* The field accepts the number in three shapes and the validator
+         normalises all three, but the box still showed what was typed -- so a
+         visitor who pasted 380931234567 read "+380 380931234567" and could not
+         tell whether it had been understood. Written back on blur, once the
+         number is complete, so nothing is rewritten mid-typing. */
+      $('#tw-phone').addEventListener('blur', function () {
+        var digits = phoneDigits();
+        if (digits.length === PHONE_DIGITS) this.value = digits;
+      });
 
-    var eye = $('.tw-eye');
-    eye.addEventListener('click', function () {
-      var input = $('#tw-password');
-      var shown = input.type === 'text';
-      input.type = shown ? 'password' : 'text';
-      eye.setAttribute('aria-pressed', String(!shown));
-      eye.setAttribute('aria-label', t(shown ? 'field.reveal' : 'field.hide'));
-      input.focus({ preventScroll: true });
-    });
+      var eye = $('.tw-eye');
+      eye.addEventListener('click', function () {
+        var input = $('#tw-password');
+        var shown = input.type === 'text';
+        input.type = shown ? 'password' : 'text';
+        eye.setAttribute('aria-pressed', String(!shown));
+        eye.setAttribute('aria-label', t(shown ? 'field.reveal' : 'field.hide'));
+        input.focus({ preventScroll: true });
+      });
 
-    $('#tw-agree').addEventListener('change', function () {
-      this.setAttribute('aria-invalid', String(!this.checked));
-    });
+      $('#tw-agree').addEventListener('change', function () {
+        this.setAttribute('aria-invalid', String(!this.checked));
+      });
 
-    form.addEventListener('submit', onSubmit);
+      form.addEventListener('submit', onSubmit);
+    }
 
     $$('[data-tw-close]').forEach(function (b) {
       b.addEventListener('click', function () { close(); });
