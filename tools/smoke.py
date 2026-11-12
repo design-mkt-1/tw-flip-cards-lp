@@ -133,6 +133,24 @@ def serve(root):
     return httpd, 'http://127.0.0.1:%d' % httpd.server_address[1]
 
 
+class Failures(list):
+    def check(self, condition, message):
+        if not condition:
+            self.append(message)
+
+
+def until(page, js, arg=None, timeout=5000):
+    """Poll `js` (an arrow function) until it returns true. page.evaluate, not
+    wait_for_function: the page's CSP refuses the string eval. False on timeout."""
+    waited = 0
+    while waited <= timeout:
+        if page.evaluate(js, arg):
+            return True
+        page.wait_for_timeout(50)
+        waited += 50
+    return False
+
+
 # Read in one pass in the page, after load. getClientRects() rather than
 # offsetParent for the close button: offsetParent is null for a positioned
 # element even when it is perfectly visible, and this button is sticky.
@@ -156,6 +174,66 @@ MEASURE = """() => {
     closeDrawn:    close ? close.getClientRects().length > 0 : null,
   };
 }"""
+
+
+# Decision 18: every control has a hit area of at least 24x24 CSS px. The hit
+# area is the element's own box, or -- where the visible control is smaller and
+# a pseudo-element carries the target -- whatever still resolves to the element
+# 11.5px either side of its centre. Both are checked with elementFromPoint, so a
+# control covered by something else fails as well. Returns one line per failure.
+TAP_TARGETS = '''(root) => {
+  const NEED = 24, HALF = NEED / 2 - 0.5;
+  const scope = root ? document.querySelector(root) : document;
+  if (!scope) return ['no element matches ' + root];
+  const label = el => (el.className && el.className.baseVal === undefined && el.className) || el.tagName;
+  const bad = [];
+  for (const el of scope.querySelectorAll(
+      'a[href], button, input, select, textarea, [role=option], [role=tab]')) {
+    let rects = [...el.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+    if (!rects.length) continue;
+    if (rects.every(r => r.width >= NEED && r.height >= NEED)) continue;
+    const first = rects[0];
+    if (first.top < 0 || first.bottom > innerHeight || first.left < 0 || first.right > innerWidth) {
+      el.scrollIntoView({block: 'center', inline: 'center'});   // elementFromPoint needs it on screen
+      rects = [...el.getClientRects()].filter(r => r.width > 0 && r.height > 0);
+    }
+    for (const t of rects) {
+      if (t.width >= NEED && t.height >= NEED) continue;
+      const cx = t.left + t.width / 2, cy = t.top + t.height / 2;
+      const dx = t.width >= NEED ? 0 : HALF, dy = t.height >= NEED ? 0 : HALF;
+      const hit = (x, y) => { const e = document.elementFromPoint(x, y);
+                              return !!e && (e === el || el.contains(e)); };
+      const ok = hit(cx - dx, cy - dy) && hit(cx + dx, cy + dy)
+              && hit(cx - dx, cy + dy) && hit(cx + dx, cy - dy);
+      if (!ok) bad.push(label(el) + ' ' + Math.round(t.width) + 'x' + Math.round(t.height));
+    }
+  }
+  return bad;
+}'''
+
+
+def tap_targets(page, tag, what, fails, root=None):
+    small = page.evaluate(TAP_TARGETS, root)
+    fails.check(not small, f"{tag} tap target(s) under 24px in {what}: {'; '.join(small)}")
+
+
+
+# Known deviations of IT's own markup / CSS from this template's checks
+# (decision 25: IT's code is copied 1:1 and is NOT fixed here). They are
+# measured and printed, never failed, so the day IT fixes one it shows up as
+# gone and a NEW offender still fails the run.
+KNOWN_IT = []
+
+
+def tap_targets_it(page, tag, what, fails, root, expected):
+    """tap_targets for IT's markup: the entries in `expected` are IT's known
+    deviations (listed, not failed); anything else still fails."""
+    small = page.evaluate(TAP_TARGETS, root)
+    known = [s for s in small if any(e in s for e in expected)]
+    new = [s for s in small if s not in known]
+    for s in known:
+        KNOWN_IT.append(f"{tag} {what}: {s}")
+    fails.check(not new, f"{tag} tap target(s) under 24px in {what}: {'; '.join(new)}")
 
 
 # The cards the visitor is meant to be able to win with: everything the deck
@@ -308,6 +386,39 @@ def play(page):
     return bad
 
 
+def tap_target_checks(page, browser, base, lang, name, width, height, stub):
+    """Decision 18 (template v1.0.19): every control is 24x24 CSS px at least.
+    `page` has just been played, so #tw-signup is open with IT's Terms / Privacy
+    / Login links filled in by the stub. Then IT's page-disabled modal is
+    opened in a context of its own, where IT's .mail-link is the known
+    deviation (decision 25: IT's code is not fixed here). Returns failures."""
+    fails = Failures()
+    tag = '[%s?lang=%s %s taps]' % (PAGE, lang, name)
+    # The Terms / Privacy / Login links exist once the landing response gave
+    # them an href; wait for it, or they are not links and are not measured.
+    if page.evaluate('() => document.getElementById("tw-signup").open'):
+        until(page, "() => [...document.querySelectorAll('.tw-agree__text a, .tw-foot a')]"
+                    ".every(a => a.getAttribute('href'))", timeout=8000)
+        until(page, "() => document.getElementById('tw-signup').getAnimations({subtree: true}).length === 0")
+        tap_targets(page, tag, 'the registration pop-up', fails, '#tw-signup')
+    else:
+        fails.check(False, '%s #tw-signup is not open, so its tap targets were not measured' % tag)
+
+    ctx = browser.new_context(viewport={'width': width, 'height': height})
+    st = platform_stub.new_state(active=False)
+    platform_stub.install(ctx, st, [base])
+    off = ctx.new_page()
+    off.goto('%s/%s?lang=%s' % (base, PAGE, lang))
+    tag = '[%s?lang=%s %s page disabled]' % (PAGE, lang, name)
+    opened = until(off, "() => document.querySelector('.disabled-modal').classList.contains('active')"
+                        " && !!document.querySelector('.mail-link').textContent", timeout=8000)
+    fails.check(opened, "%s IT's modal did not open with the support address" % tag)
+    if opened:
+        tap_targets_it(off, tag, "IT's page-disabled modal", fails, '.disabled-modal', ['mail-link'])
+    ctx.close()
+    return list(fails)
+
+
 def check(page, url, errors):
     """Load one page and return its list of failure strings."""
     page.goto(url, wait_until='load')
@@ -388,6 +499,8 @@ def main():
                         bad.extend(play(page))
                     except Skipped as why:
                         played = 'game not played (%s)' % why
+                    bad.extend(tap_target_checks(page, browser, base, lang, name,
+                                                 width, height, stub))
                     bad.extend(errors)
                     bad.extend('left the page: ' + u for u in stub['leaks'])
                     stub['leaks'].clear()
@@ -407,6 +520,8 @@ def main():
             browser.close()
             httpd.shutdown()
 
+    for line in KNOWN_IT:
+        print('known IT deviation (not failed): ' + line)
     if failures:
         print('\nsmoke: %d failure%s' % (failures, '' if failures == 1 else 's'))
         return 1
