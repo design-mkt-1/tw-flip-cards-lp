@@ -91,6 +91,7 @@ var TW_STRINGS = (function () {
       'agree.post':         '.',
 
       'cta.register':       'ЗАРЕЄСТРУВАТИСЬ',
+      'cta.loading':        'Завантаження…',
       'foot.have':          'Вже є акаунт?',
       'foot.login':         'Увійти',
 
@@ -148,6 +149,7 @@ var TW_STRINGS = (function () {
       'agree.post':         '.',
 
       'cta.register':       'ЗАРЕГИСТРИРОВАТЬСЯ',
+      'cta.loading':        'Загрузка…',
       'foot.have':          'Уже есть аккаунт?',
       'foot.login':         'Войти',
 
@@ -200,6 +202,7 @@ var TW_STRINGS = (function () {
       'agree.post':         '.',
 
       'cta.register':       'REGISTER',
+      'cta.loading':        'Loading…',
       'foot.have':          'Already have an account?',
       'foot.login':         'Log in',
 

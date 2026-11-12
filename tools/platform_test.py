@@ -77,10 +77,14 @@ IT_TEXT = {
     'ok_btn': 'Go to the site',
     'rc_text': ('Unfortunately, we were unable to verify your identity. '
                 'Please try registering using a different browser or device.'),
-    'continue': 'Continue',
     'disabled_title': 'Page disabled',
     'disabled_text': 'The page you are looking for appears to be disabled',
 }
+# Addendum 2026-11-12 to decision 25: the register button's two labels follow the
+# page language (the landing's own cta.register / cta.loading); all else is IT's.
+BTN = {'ua': ('ЗАРЕЄСТРУВАТИСЬ', 'Завантаження…'),
+       'ru': ('ЗАРЕГИСТРИРОВАТЬСЯ', 'Загрузка…'),
+       'en': ('REGISTER', 'Loading…')}
 RC_EXACT = 'reCAPTCHA verification failed. Please try again.'
 TAKEN = 'Email already registered. Please use a different email or login.'
 
@@ -227,8 +231,8 @@ def main():
             head = got.replace('\r\n', '\n')
             head = head[:head.index(FORM_TEXT_MARK)].rstrip('\n') + '\n'
             check('copy: ' + rel + ' = IT\'s, plus the UA / RU lines',
-                  sha(head) == want and 'LANG_TEXTS.UA = LANG_TEXTS.EN;' in got
-                  and 'LANG_TEXTS.RU = LANG_TEXTS.EN;' in got, 'hash differs')
+                  sha(head) == want and 'LANG_TEXTS.UA = {...LANG_TEXTS.EN};' in got
+                  and 'LANG_TEXTS.RU = {...LANG_TEXTS.EN};' in got, 'hash differs')
         else:
             check('copy: ' + rel + ' = IT\'s, byte for byte', sha(got) == want, 'hash differs')
     main_js = read('js/it/main.js')
@@ -301,9 +305,9 @@ def main():
                                 'btn': IT_TEXT['ok_btn'], 'icon': 'assets/img/it/check-success.svg',
                                 'shown': 'flex'}, str(texts))
                 check(tag + 'the pop-up is closed behind it', not r.dialog_open())
-                check(tag + 'button label after the request is IT\'s "Continue"',
+                check(tag + 'button label after the request is the page-language register label',
                       r.page.evaluate('document.querySelector(".form-register-submit").textContent')
-                      == IT_TEXT['continue'])
+                      == BTN[lang][0], r.page.evaluate('document.querySelector(".form-register-submit").textContent'))
                 r.settle(300)
                 check(tag + 'NOTHING is posted to the casino before the button is clicked', not st['sso'], str(st['sso']))
                 action = r.page.evaluate('document.getElementById("sso").getAttribute("action")')
@@ -385,9 +389,14 @@ def main():
             r.close()
 
             # ── 4. errors: the raw server text, IT's exact match ─────
-            def failing(register_json, status=400, **kw):
-                r = Run(browser, base, register_status=status, register_json=register_json, **kw).open('en')
-                r.submit()
+            def failing(register_json, status=400, lang='en', **kw):
+                r = Run(browser, base, register_status=status, register_json=register_json, **kw).open(lang)
+                r.fill()
+                r.page.evaluate('''() => { const b = document.querySelector(".form-register-submit");
+                    window.__labels = [b.textContent];
+                    new MutationObserver(() => window.__labels.push(b.textContent))
+                        .observe(b, {childList: true, characterData: true, subtree: true}); }''')
+                r.page.click('.tw-cta[type="submit"]')
                 r.wait(lambda: bool(r.state['registered']))
                 r.settle(300)
                 return r
@@ -396,9 +405,16 @@ def main():
             check('error: the raw server message is the email error, nothing translated',
                   r.text('.error-email span') == TAKEN and r.active('.error-email')
                   and not r.active('.modal__wrap') and not r.active('.success-modal'), r.text('.error-email span'))
-            check('error: button usable again, label "Continue"',
-                  r.page.evaluate('(() => { const b = document.querySelector(".form-register-submit");'
-                                  ' return !b.disabled && b.textContent; })()') == IT_TEXT['continue'])
+            for blang in LANGS:
+                rb = r if blang == 'en' else failing({'errors': [TAKEN]}, lang=blang)
+                got = rb.page.evaluate('(() => { const b = document.querySelector(".form-register-submit");'
+                                       ' return [!b.disabled, b.textContent, window.__labels]; })()')
+                check('error [%s]: button usable again, label = page-language register label' % blang,
+                      got[0] and got[1] == BTN[blang][0], str(got))
+                check('error [%s]: the loading label was the page-language one' % blang,
+                      BTN[blang][1] in got[2], str(got))
+                if rb is not r:
+                    rb.close()
             check('error: no SSO, console shows no uncaught error',
                   not r.state['sso'] and not any(e.startswith('uncaught') for e in r.errors), str(r.errors))
             r.close()
