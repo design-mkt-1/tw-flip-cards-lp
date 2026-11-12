@@ -40,21 +40,25 @@
                 config.email_registration with Content-Type: application/json.
                 `language` is the active language button's text lowercased,
                 as IT sends it: ua, ru or en.
-   5. success.  PENDING IT ANSWER (owner, 2026-11-11): the SSO hand-off below
-                is kept as it was until IT says which is right.
-                response.data.accessToken and response.data.redirectUrl.
-                TopWin returns redirectUrl: the tracker mirror with modal=signIn.
-                That URL is POSTed to <mirror>/api/welcome as tmpToken + redirect.
-                Without redirectUrl, IT's path: <rules host>/api/welcome and
-                redirect /{language}/{redirect_link}. The confirmation screen
-                is never shown.
+   5. success.  As IT's page does it (owner, 2026-11-12, decision 24):
+                response.data.accessToken only. The SSO form is prepared
+                (POST <rules host>/api/welcome, tmpToken = accessToken,
+                redirect = <host>/{language}/{redirect_link} plus the page's
+                query) and a success modal opens; the form is submitted only
+                when the visitor clicks its button. data.redirectUrl is not
+                read. The modal is TopWin's own dialog, not IT's markup.
+   6. errors.   "email already registered": our translated line in the form.
+                A reCAPTCHA failure: that line AND a separate modal, as IT
+                does, matched loosely on "recaptcha". Anything else: the
+                template's generic line; the server's text is never shown.
 
    ── What form.js does with what we return ────────────────────
    onRegister's result is awaited. Resolve -> showDone() with the credentials.
    Reject -> the generic "could not send" line. So:
-     * success  -> a promise that NEVER settles. The page is navigating away;
-                   resolving would flash the done screen, and the password the
-                   visitor just typed, for the length of the redirect.
+     * success  -> a promise that NEVER settles. The success modal takes over
+                   and the page navigates away on its button; resolving would
+                   flash the done screen, and the password the visitor just
+                   typed.
      * a message we have our own words for (email taken, reCAPTCHA) -> written
                    into the form's error line here, then also never settles.
      * anything else -> reject, and the template's generic line shows.
@@ -122,9 +126,9 @@
   var offShown = false;
   var busy = false;
 
-  /* platform.dev counts only with all three values. The template ships it
-     empty: TopWin has no dev landing yet, and another brand's landing must
-     never stand in for one (decision 21 in the topwin-lp skill). */
+  /* platform.dev counts only with all three values. The template ships IT's
+     TEMP_CONFIG (decision 24 in the topwin-lp skill); empty it and localhost
+     goes back to the demo path. */
   function devConfig() {
     var d = P.dev;
     return d && d.id && d.email_registration && d.landing ? d : null;
@@ -146,7 +150,7 @@
      malformed file is a fault and rejects. */
   function loadConfig() {
     if (isDevelopment() && devConfig()) return Promise.resolve(devConfig());
-    if (isLocal()) return Promise.resolve(null);   // no TopWin dev landing yet: the demo path
+    if (isLocal()) return Promise.resolve(null);   // platform.dev emptied: the demo path
     if (configP) return configP;
     configP = fetch(P.configUrl || 'config.json')   // IT: fetch("config.json"), no options
       .then(function (r) {
@@ -441,33 +445,20 @@
   /* A real form POST, because that is what /api/welcome takes and because the
      token must travel in a body, never in a URL that history and referrers
      keep. tmpToken is a one-shot login ticket, not the password.
-     When the API returns redirectUrl, welcome is posted to that mirror and
-     redirect is the sign-in page. The CRM redirect_link is only the fallback.
-     PENDING IT ANSWER (owner, 2026-11-11): IT's template has only the
-     fallback path (<rules host>/api/welcome, /{lang}/{redirect_link}, and a
-     button the visitor clicks). The owner asked IT which is right; until
-     they answer, this stays as it was. The fallback's {lang} is IT's
-     redirectLang, the same lowercased button text the body sends. */
-  function sso(token, redirectUrl) {
-    var action, redirect;
-    if (redirectUrl) {
-      var mirror = new URL(redirectUrl);
-      action = mirror.origin + '/api/welcome';
-      redirect = withQuery(redirectUrl);
-    } else {
-      var d = landing.data;
-      var lang = language();
-      var path = [lang, String(d.redirect_link || '').replace(/^\/+/, '')]
-        .filter(Boolean).join('/');
-      action = landing.domain + '/api/welcome';
-      redirect = withQuery(landing.domain + '/' + path);
-    }
+     IT's path, and only it: <rules host>/api/welcome, redirect
+     <host>/{lang}/{redirect_link} plus the page query, {lang} being IT's
+     redirectLang (the lowercased language button text the body sends). The
+     form is built here and submitted by the success modal's button. */
+  function buildSso(token) {
+    var d = landing.data;
+    var path = [language(), String(d.redirect_link || '').replace(/^\/+/, '')]
+      .filter(Boolean).join('/');
     var form = document.createElement('form');
     form.method = 'POST';
-    form.action = action;
+    form.action = landing.domain + '/api/welcome';
     form.enctype = 'application/x-www-form-urlencoded';
     form.hidden = true;
-    [['tmpToken', token], ['redirect', redirect]].forEach(function (p) {
+    [['tmpToken', token], ['redirect', withQuery(landing.domain + '/' + path)]].forEach(function (p) {
       var input = document.createElement('input');
       input.type = 'hidden';
       input.name = p[0];
@@ -475,7 +466,60 @@
       form.appendChild(input);
     });
     document.body.appendChild(form);
-    form.submit();
+    return form;
+  }
+
+  /* ── the success and reCAPTCHA modals ─────────────────────── */
+
+  /* TopWin's dialog (.tw-dialog / .tw-card / .tw-cta from css/form.css), the
+     same shell as the "unavailable" card. The success one is not dismissible
+     by Escape: the visitor is registered and the button is the way on. Focus
+     goes to the dialog's button explicitly, so it does not depend on which
+     control the browser picks first. */
+  function makeDialog(id, html) {
+    var el = document.createElement('dialog');
+    el.className = 'tw-dialog pl-modal';
+    el.id = id;
+    el.innerHTML = '<div class="tw-card">' +
+      '<img class="tw-promo__logo" src="' + (C.brand || {}).logo + '" alt="">' + html + '</div>';
+    document.body.appendChild(el);
+    if (window.TWI18n) TWI18n.apply(el);
+    return el;
+  }
+
+  function showSuccess(form) {
+    var el = document.getElementById('pl-ok');
+    if (!el) {
+      el = makeDialog('pl-ok',
+        '<h2 class="tw-done__title" id="pl-ok-title" data-i18n="pl.ok.title"></h2>' +
+        '<p class="tw-done__note" id="pl-ok-text" data-i18n="pl.ok.text"></p>' +
+        '<button type="button" class="tw-cta pl-modal__btn" data-i18n="pl.ok.btn"></button>');
+      el.setAttribute('aria-labelledby', 'pl-ok-title');
+      el.setAttribute('aria-describedby', 'pl-ok-text');
+      el.addEventListener('cancel', function (ev) { ev.preventDefault(); });
+      el.querySelector('.pl-modal__btn').addEventListener('click', function () {
+        if (this.disabled) return;
+        this.disabled = true;     // one submit, however many clicks
+        el._sso.submit();
+      });
+    }
+    el._sso = form;
+    if (window.TWForm) TWForm.close();
+    if (!el.open) el.showModal();
+    el.querySelector('.pl-modal__btn').focus();
+  }
+
+  function showRecaptchaModal() {
+    var el = document.getElementById('pl-rc');
+    if (!el) {
+      el = makeDialog('pl-rc',
+        '<p class="tw-done__note" id="pl-rc-text" data-i18n="pl.rc.text"></p>' +
+        '<button type="button" class="tw-cta pl-modal__btn" data-i18n="dialog.close"></button>');
+      el.setAttribute('aria-labelledby', 'pl-rc-text');
+      el.querySelector('.pl-modal__btn').addEventListener('click', function () { el.close(); });
+    }
+    if (!el.open) el.showModal();
+    el.querySelector('.pl-modal__btn').focus();
   }
 
   function register() {
@@ -514,16 +558,19 @@
           return post(body);
         }).then(function (res) {
           var token = res && res.data && res.data.accessToken;
-          var redirectUrl = res && res.data && res.data.redirectUrl;
           if (!token) throw new Error('registered, but no accessToken');
-          if (!redirectUrl && !landing.domain) throw new Error('registered, but no redirectUrl or casino domain');
+          if (!landing.domain) throw new Error('registered, but no casino domain');
           if (window.TW) TW.track('form_success', { method: 'email' });
-          sso(token, redirectUrl);          // busy stays on: the page is leaving
+          showSuccess(buildSso(token));     // busy stays on: the button leaves the page
         });
       }).catch(function (err) {
         console.warn('[platform] registration failed:', err && err.message);
         setBusy(false);
-        if (err && err.key) { showError(err.key); return; }   // ours: never settles
+        if (err && err.key) {                                  // ours: never settles
+          showError(err.key);
+          if (err.key === 'err.recaptcha') showRecaptchaModal();
+          return;
+        }
         reject(err);
       });
     });

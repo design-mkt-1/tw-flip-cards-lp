@@ -9,10 +9,12 @@ project served from a loopback port, and NOT ONE real request -- the platform
 API, ipify and Google are all answered by tools/platform_stub.py, and anything
 else that leaves the page fails the run.
 
-campaign.js ships platform.dev EMPTY (TopWin has no dev landing yet) and
-platform.supportEmail = support@top-win.com. Each run injects stubmod.DEV as
-platform.dev before campaign.js is read, so the flows run as on a configured
-localhost; the runs that test the empty values say so.
+campaign.js ships platform.dev = IT's TEMP_CONFIG (decision 24), a host on the
+network that must never be reached from a test, and platform.supportEmail =
+support@top-win.com. Each run injects stubmod.DEV as platform.dev before
+campaign.js is read, so every flow talks to the stub; the runs that test the
+empty values or campaign.js's own values say so (the latter answers that host
+from the stub, it never reaches the network).
 
 It walks the scenarios a visitor can actually hit:
 
@@ -30,10 +32,15 @@ It walks the scenarios a visitor can actually hit:
                      application/json), the order is IT's (landing GET,
                      api.js?render=<key>, ipify at load, then the POST), and
                      `language` is IT's code: ua, ru, en
-  success + SSO      the hidden POST to the casino, and the done screen (with
-                     the password) never shown. SSO is PENDING IT's answer.
+  success modal     after registering, a TopWin dialog in ua/ru/en: focus on the
+                     dialog's button (>= 24px), Escape does not dismiss it, and
+                     NOTHING is posted until the button is clicked
+  SSO                the button submits the hidden POST to <rules host>/api/welcome
+                     (tmpToken, redirect = host/lang/redirect_link + page query);
+                     the done screen (with the password) is never shown
   email taken        its own message in every language, button usable again
-  reCAPTCHA failure  from the server and from the browser, its own message
+  reCAPTCHA failure  from the server and from the browser: its own message in
+                     the form AND a separate modal (ua/ru/en) with a close button
   network failure    the template's generic line
   loading state      the button is disabled while the request is in flight
   hiddenFields       not sent: IT's body has no such thing
@@ -43,9 +50,11 @@ It walks the scenarios a visitor can actually hit:
                      LP does: valid IDs load, invalid ones are skipped, none
                      loads nothing, an inactive landing still loads them, demo
                      loads nothing, and the console shows no CSP refusal
-  redirectUrl        TopWin's redirectUrl: the hand-off goes to its mirror, with
-                     the page query; no redirectUrl and no casino domain -> the
-                     generic line and nothing posted
+  redirectUrl        ignored: the hand-off goes to the rules host even when the
+                     answer carries one; no casino domain -> the generic line
+                     and nothing posted
+  campaign.js dev    the file's own platform.dev works end to end (answered by
+                     the stub), with landing id 8
   no CSP             index.html has no Content-Security-Policy, as IT's has none
   badge              the reCAPTCHA badge is hidden, as IT's LP hides it
 """
@@ -106,6 +115,25 @@ MESSAGES = {
            'off': 'This page is temporarily unavailable'},
 }
 
+# The two modals' texts, as the owner reviewed them (decision 24).
+MODAL = {
+    'ua': {'ok_title': 'Вітаємо!',
+           'ok_text': 'Реєстрацію завершено. Ласкаво просимо до кола переможців.',
+           'ok_btn': 'Перейти на сайт',
+           'rc_text': 'На жаль, нам не вдалося підтвердити вашу особу. Спробуйте зареєструватися в іншому браузері або на іншому пристрої.',
+           'close': 'Закрити'},
+    'ru': {'ok_title': 'Поздравляем!',
+           'ok_text': 'Регистрация завершена. Добро пожаловать в круг победителей.',
+           'ok_btn': 'Перейти на сайт',
+           'rc_text': 'К сожалению, нам не удалось подтвердить вашу личность. Попробуйте зарегистрироваться в другом браузере или на другом устройстве.',
+           'close': 'Закрыть'},
+    'en': {'ok_title': 'Congratulations!',
+           'ok_text': "Your registration is complete. Welcome to the winners' circle.",
+           'ok_btn': 'Go to the site',
+           'rc_text': 'Unfortunately, we were unable to verify your identity. Please try registering using a different browser or device.',
+           'close': 'Close'},
+}
+
 ERROR_SHOWN = ('() => { const b = document.querySelector(".tw-err[data-form-error]");'
                ' return !b.hidden && b.textContent; }')
 SSO_DONE = '() => document.title === "casino stub"'
@@ -129,8 +157,9 @@ class Run:
         self.base = base
         self.state = stubmod.new_state(**state)
         self.ctx = browser.new_context(viewport={'width': 1440, 'height': 900})
-        over = {'dev': stubmod.DEV}
-        over.update(platform or {})
+        over = {} if platform == 'own' else {'dev': stubmod.DEV}
+        if platform != 'own':
+            over.update(platform or {})
         self.ctx.add_init_script(INJECT % json.dumps(over))
         stubmod.install(self.ctx, self.state, [base])
         self.page = self.ctx.new_page()
@@ -153,6 +182,13 @@ class Run:
         p.fill('#tw-email', email)
         p.fill('#tw-password', password)
         p.click('.tw-cta[type="submit"]')
+
+    def finish(self):
+        """Registration succeeded: click the success modal's button and wait
+        for the casino stub to load, which is the SSO POST arriving."""
+        self.page.wait_for_selector('#pl-ok[open] .pl-modal__btn', timeout=6000)
+        self.page.click('#pl-ok .pl-modal__btn')
+        self.page.wait_for_function(SSO_DONE, timeout=6000)
 
     def form_error(self):
         return self.page.evaluate(
@@ -277,6 +313,31 @@ def main():
             r.settle()
             r.page.evaluate("TW_CAMPAIGN.form.hiddenFields = {email: 'hacked', landing_id: 'hacked', extra: 'no'}")
             r.fill_and_submit()
+            r.page.wait_for_selector('#pl-ok[open] .pl-modal__btn', timeout=6000)
+            r.settle(600)
+            m = r.page.evaluate("""() => {
+                const d = document.getElementById('pl-ok'), b = d.querySelector('.pl-modal__btn');
+                const rect = b.getBoundingClientRect();
+                return { focusOnBtn: document.activeElement === b, open: d.open, modal: d.matches(':modal'),
+                         label: document.getElementById(d.getAttribute('aria-labelledby')).textContent,
+                         desc: document.getElementById(d.getAttribute('aria-describedby')).textContent,
+                         btn: b.textContent.trim(), h: rect.height, w: rect.width,
+                         raw: /pl[.](ok|rc)[.]/.test(d.textContent) };
+            }""")
+            check('success modal: opened as a modal, focus on its button',
+                  m['open'] and m['modal'] and m['focusOnBtn'], str(m))
+            check('success modal: button is at least 24px', m['h'] >= 24 and m['w'] >= 24, str(m))
+            check('success modal: title (aria-labelledby) and text (aria-describedby) in Ukrainian',
+                  m['label'] == MODAL['ua']['ok_title'] and m['desc'] == MODAL['ua']['ok_text']
+                  and m['btn'] == MODAL['ua']['ok_btn'] and not m['raw'], str(m))
+            r.page.keyboard.press('Escape')
+            r.settle(200)
+            check('success modal: Escape does not dismiss it', r.page.evaluate('document.getElementById("pl-ok").open'))
+            check('success modal: the registration form is closed behind it',
+                  not r.page.evaluate('document.getElementById("tw-signup").open'))
+            check('success modal: NOTHING is posted to the casino before the button is clicked',
+                  not r.state['sso'] and r.page.title() != 'casino stub', str(r.state['sso']))
+            r.page.click('#pl-ok .pl-modal__btn')
             r.page.wait_for_function(SSO_DONE, timeout=6000)
             body = r.state['registered'][0] if r.state['registered'] else {}
             # IT's main.js: { email, password, landing_id, language, currency,
@@ -335,7 +396,7 @@ def main():
                 btn = r.page.evaluate("() => { const c = document.querySelector('.tw-lang__code');"
                                       " return c ? c.textContent.trim() : ''; }")
                 r.fill_and_submit()
-                r.page.wait_for_function(SSO_DONE, timeout=6000)
+                r.finish()
                 sent = r.state['registered'][0].get('language') if r.state['registered'] else None
                 check('IT language, %s: button says %s, body sends %r' % (lang, lang.upper(), lang),
                       sent == lang and btn == lang.upper(), '%r / button %r' % (sent, btn))
@@ -345,7 +406,7 @@ def main():
             r.page.evaluate("TW.setLang('ru')")
             r.settle(150)
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             sent = r.state['registered'][0].get('language') if r.state['registered'] else None
             check('IT language: a switch to RU sends "ru"', sent == 'ru', str(sent))
             r.close()
@@ -353,7 +414,7 @@ def main():
             r = Run(browser, base).open('landing_id=999&promocode=URLCODE')
             r.settle()
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             body = r.state['registered'][0] if r.state['registered'] else {}
             check('IT body: a URL param named like a field overwrites it, as on IT\'s page',
                   body.get('landing_id') == '999' and body.get('promocode') == 'URLCODE'
@@ -379,38 +440,63 @@ def main():
             r.open()
             r.settle()
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             r.settle(500)
             check('success: the confirmation screen (login + password) is never shown',
                   len(r.state['sso']) == 1 and not seen, str(seen))
             r.close()
 
-            # ── success with redirectUrl (TopWin): the hand-off goes to its mirror ──
+            # ── success modal text in every language ──
+            for lang in ('ua', 'ru', 'en'):
+                r = Run(browser, base).open('lang=' + lang)
+                r.settle()
+                r.fill_and_submit()
+                r.page.wait_for_selector('#pl-ok[open] .pl-modal__btn', timeout=6000)
+                got = r.page.evaluate("""() => ({
+                    t: document.getElementById('pl-ok-title').textContent,
+                    x: document.getElementById('pl-ok-text').textContent,
+                    b: document.querySelector('#pl-ok .pl-modal__btn').textContent.trim() })""")
+                check('success modal, %s: the reviewed title, text and button' % lang,
+                      got == {'t': MODAL[lang]['ok_title'], 'x': MODAL[lang]['ok_text'],
+                              'b': MODAL[lang]['ok_btn']}, str(got))
+                check('success modal, %s: console clean, nothing leaked' % lang,
+                      not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
+                r.close()
+
+            # ── redirectUrl is ignored: IT's template does not read it ──
             r = Run(browser, base, redirect_url=stubmod.MIRROR + '/uk?modal=signIn').open('lang=ua&click_id=CLK1&sub1=S1')
             r.settle()
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             sso = r.state['sso']
             fields = parse_qs(sso[0]['body']) if sso else {}
-            check('redirectUrl: one POST to <mirror>/api/welcome',
-                  len(sso) == 1 and sso[0]['method'] == 'POST'
-                  and sso[0]['url'] == stubmod.MIRROR + '/api/welcome', str(sso))
-            check('redirectUrl: tmpToken is the accessToken', fields.get('tmpToken') == ['TMP-TOKEN-123'], str(fields))
-            check('redirectUrl: redirect is the redirectUrl plus the page query',
-                  fields.get('redirect') == [stubmod.MIRROR + '/uk?modal=signIn&lang=ua&click_id=CLK1&sub1=S1'],
+            check('redirectUrl ignored: one POST, to <rules host>/api/welcome, not the mirror',
+                  len(sso) == 1 and sso[0]['url'] == stubmod.CASINO + '/api/welcome', str(sso))
+            check('redirectUrl ignored: redirect is <host>/ua/lobby + the page query',
+                  fields.get('redirect') == [stubmod.CASINO + '/ua/lobby?lang=ua&click_id=CLK1&sub1=S1'],
                   str(fields.get('redirect')))
-            check('redirectUrl: only the stubbed origins were contacted, console clean',
-                  not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
             r.close()
 
-            # No redirectUrl and no casino domain: nothing to hand off to.
+            # ── the button submits once, however many clicks ──
+            r = Run(browser, base).open('lang=en')
+            r.settle()
+            r.fill_and_submit()
+            r.page.wait_for_selector('#pl-ok[open] .pl-modal__btn', timeout=6000)
+            r.page.dblclick('#pl-ok .pl-modal__btn')
+            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.settle(300)
+            check('success modal: a double click posts to the casino once', len(r.state['sso']) == 1, str(r.state['sso']))
+            r.close()
+
+            # No casino domain (the landing has no rules URL): nothing to hand off to.
             r = Run(browser, base, casino_rules=False).open('lang=en')
             r.settle()
             r.fill_and_submit()
             r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
-            check('no redirectUrl, no casino domain: the generic line',
-                  r.form_error() == MESSAGES['en']['network'], r.form_error())
-            check('no redirectUrl, no casino domain: nothing posted to any welcome',
+            check('no casino domain: the generic line, no success modal',
+                  r.form_error() == MESSAGES['en']['network'] and not r.page.locator('#pl-ok').count(),
+                  r.form_error())
+            check('no casino domain: nothing posted to any welcome',
                   not r.state['sso'], str(r.state['sso']))
             r.close()
 
@@ -424,6 +510,8 @@ def main():
                 r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
                 check('email taken, %s: its own message' % lang,
                       r.form_error() == MESSAGES[lang]['exists'], r.form_error())
+                check('email taken, %s: no modal, only the form line' % lang,
+                      not r.page.locator('#pl-rc').count() and not r.page.locator('#pl-ok').count())
                 check('email taken, %s: button usable again, no SSO' % lang,
                       not r.page.is_disabled('.tw-cta[type="submit"]') and not r.state['sso'])
                 # Chromium logs the stub's own HTTP 400 as a console error; that
@@ -441,6 +529,23 @@ def main():
                 r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
                 check('recaptcha refused by the server, %s: its own message' % lang,
                       r.form_error() == MESSAGES[lang]['recaptcha'], r.form_error())
+                r.page.wait_for_selector('#pl-rc[open]', timeout=4000)
+                r.settle(500)
+                rc = r.page.evaluate("""() => {
+                    const d = document.getElementById('pl-rc'), b = d.querySelector('.pl-modal__btn');
+                    return { modal: d.matches(':modal'), focusOnBtn: document.activeElement === b,
+                             text: document.getElementById(d.getAttribute('aria-labelledby')).textContent,
+                             btn: b.textContent.trim(), h: b.getBoundingClientRect().height,
+                             ok: !!document.getElementById('pl-ok') }; }""")
+                check('recaptcha modal, %s: a separate modal, reviewed text, focus on its button' % lang,
+                      rc['modal'] and rc['focusOnBtn'] and rc['text'] == MODAL[lang]['rc_text']
+                      and rc['btn'] == MODAL[lang]['close'] and not rc['ok'], str(rc))
+                check('recaptcha modal, %s: its button is at least 24px' % lang, rc['h'] >= 24, str(rc))
+                r.page.click('#pl-rc .pl-modal__btn')
+                r.settle(300)
+                check('recaptcha modal, %s: the button closes it, nothing posted to the casino, form usable' % lang,
+                      not r.page.evaluate('document.getElementById("pl-rc").open')
+                      and not r.state['sso'] and not r.page.is_disabled('.tw-cta[type="submit"]'))
                 r.close()
 
             r = Run(browser, base, recaptcha_ok=False).open('lang=en')
@@ -449,10 +554,15 @@ def main():
             r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
             check('recaptcha fails in the browser: its message, nothing posted',
                   r.form_error() == MESSAGES['en']['recaptcha'] and not r.state['registered'], r.form_error())
+            r.page.wait_for_selector('#pl-rc[open]', timeout=4000)
+            check('recaptcha fails in the browser: the modal opens too',
+                  r.page.inner_text('#pl-rc-text').strip() == MODAL['en']['rc_text'])
             r.page.evaluate("TW.setLang('ru')")
             r.settle(150)
             check('error message follows a language switch',
                   r.form_error() == MESSAGES['ru']['recaptcha'], r.form_error())
+            check('recaptcha modal follows a language switch',
+                  r.page.inner_text('#pl-rc-text').strip() == MODAL['ru']['rc_text'])
             r.close()
 
             r = Run(browser, base, register_abort=True).open('lang=en')
@@ -461,16 +571,50 @@ def main():
             r.page.wait_for_function(ERROR_SHOWN, timeout=5000)
             check('network failure: the template\'s generic line',
                   r.form_error() == MESSAGES['en']['network'], r.form_error())
-            check('network failure: button usable again', not r.page.is_disabled('.tw-cta[type="submit"]'))
+            check('network failure: button usable again, no modal',
+                  not r.page.is_disabled('.tw-cta[type="submit"]') and not r.page.locator('#pl-rc, #pl-ok').count())
             r.close()
 
             r = Run(browser, base, ipify_ok=False).open('lang=en')
             r.settle()
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             check('ipify down: registration still goes, clientIp is ""',
                   r.state['registered'] and r.state['registered'][0].get('clientIp') == '')
             r.close()
+
+            # ── campaign.js's own platform.dev (IT's TEMP_CONFIG), end to end ──
+            # No override: the file's values are read. Their host is added to the
+            # stub's list, so it is answered locally and nothing reaches the network.
+            text = (ROOT / 'campaign.js').read_text(encoding='utf-8')
+            block = text[text.index('dev: {'):]
+            block = block[:block.index('}')]
+            own_id = re.search(r"id:\s*(\d+)", block)
+            own_reg = re.search(r"email_registration:\s*'([^']+)'", block)
+            own_land = re.search(r"landing:\s*'([^']+)'", block)
+            check('campaign.js dev: id 8, registration/email and landing/8 on one https host',
+                  bool(own_id and own_reg and own_land) and own_id.group(1) == '8'
+                  and own_reg.group(1).endswith('/api/jp/registration/email')
+                  and own_land.group(1).endswith('/api/jp/landing/8')
+                  and urlparse(own_reg.group(1)).netloc == urlparse(own_land.group(1)).netloc
+                  and urlparse(own_land.group(1)).scheme == 'https', block)
+            if own_land:
+                u = urlparse(own_land.group(1))
+                stubmod.APIS = stubmod.APIS + ('%s://%s' % (u.scheme, u.netloc),)
+                try:
+                    r = Run(browser, base, platform='own').open('lang=en')
+                    r.settle()
+                    r.fill_and_submit()
+                    r.finish()
+                    check('campaign.js dev: landing GET, registration POST with landing_id 8, SSO only after the click',
+                          r.state['order'].count('landing') == 1 and r.state['registered']
+                          and r.state['registered'][0].get('landing_id') == 8 and len(r.state['sso']) == 1,
+                          str(r.state['order']))
+                    check('campaign.js dev: only stubbed origins contacted, console clean',
+                          not r.state['leaks'] and not r.errors, str(r.state['leaks'] + r.errors))
+                    r.close()
+                finally:
+                    stubmod.APIS = (stubmod.PROD_API,)
 
             # ── loading state: the registration request is never answered ──
             r = Run(browser, base).open('lang=en')
@@ -512,7 +656,7 @@ def main():
                    'landing': stubmod.API + '/api/jp/landing/42'}
             r = prod(cfg)
             r.fill_and_submit()
-            r.page.wait_for_function(SSO_DONE, timeout=6000)
+            r.finish()
             check('production, config.json present: its id is the landing_id',
                   r.state['registered'] and r.state['registered'][0].get('landing_id') == 42)
             r.close()

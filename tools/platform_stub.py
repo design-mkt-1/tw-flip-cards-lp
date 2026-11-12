@@ -16,8 +16,9 @@ import json
 PROD_API = 'https://api2-land-prod.top-win.promo'
 API = PROD_API
 APIS = (PROD_API,)
-# What the tests put in campaign.js § platform.dev, which ships empty because
-# TopWin has no dev landing yet (decision 21). Injected by platform_test.py.
+# What the tests put in campaign.js § platform.dev, which ships IT's own dev
+# config (decision 24), a real host. Injected by platform_test.py and smoke.py
+# so the page never calls it.
 DEV = {'id': 7,
        'email_registration': API + '/api/jp/registration/email',
        'landing': API + '/api/jp/landing/7'}
@@ -27,7 +28,8 @@ CASINO = 'https://casino.topwin-bet.test'
 # A host that is not TopWin's. Since 2026-11-11 the page applies the landing's
 # links as IT's template does, with no host filter, so these are applied too.
 FOREIGN = 'https://casino.example.invalid'
-# The tracker mirror TopWin returns as redirectUrl. Its /api/welcome is answered like the casino's.
+# A mirror the registration answer may carry as redirectUrl. The page ignores it
+# (decision 24); its /api/welcome is answered so a test can prove nothing is posted there.
 MIRROR = 'https://mirror.example'
 # The analytics hosts js/platform.js loads from the landing response. They are
 # answered with an empty script, so nothing reaches Google or Yandex.

@@ -121,10 +121,11 @@ email + password only** — the phone tab is removed, because the API is
 
 1. **Config.** On `localhost`, `127.0.0.1` or an origin starting with
    `https://land-crm` the page uses `platform.dev` in `campaign.js` once all
-   three of its values are set. It is EMPTY: the dev landing it held belonged
-   to IT's other casino brand and was removed on 2026-11-11 (tw-lp-template
-   decision 21). A TopWin dev landing must be requested from IT; until then
-   localhost runs the demo path and land-crm reads `config.json`.
+   three of its values are set. It holds IT's own TEMP_CONFIG (landing 8 on
+   `api2-land-dev`), accepted by the owner on 2026-11-12 (tw-lp-template
+   decision 24): both brands share one platform and database, so a local test
+   registration lands in landing 8. Emptied, localhost runs the demo path and
+   land-crm reads `config.json`. A real TopWin dev landing replaces it.
    **Everywhere else** it fetches `config.json` from the site root:
    `{ "id": <number>, "email_registration": "<url>", "landing": "<url>" }`.
    Our landing is **id 12** on `api2-land-prod.top-win.promo`, and it runs live
@@ -146,19 +147,18 @@ email + password only** — the phone tab is removed, because the API is
    `g-recaptcha-response`, then `POST config.email_registration` with
    `Content-Type: application/json`. `language` is IT's code, the language
    button lowercased: `ua`, `ru` or `en`. `form.hiddenFields` is not sent.
-4. **Success (PENDING IT's answer -- kept as it was).** The API answers with `response.data.accessToken` and
-   `response.data.redirectUrl`. TopWin's `redirectUrl` is the tracker mirror with
-   `modal=signIn`. The token is POSTed (hidden form,
-   `application/x-www-form-urlencoded`) to `<mirror>/api/welcome` as `tmpToken`,
-   with `redirect` = the `redirectUrl` plus the page's query string. The player
-   arrives logged in. Without `redirectUrl` the older path is the fallback: the
-   token goes to `<casino>/api/welcome` with
+4. **Success (template v1.0.21, owner 2026-11-12).** Only `response.data.accessToken`
+   is read; `redirectUrl` is not. A TopWin-style success modal (`#pl-ok`, texts
+   `pl.ok.*` in `js/strings.js`) opens. Only when the visitor clicks its button
+   is the token POSTed (hidden form, `application/x-www-form-urlencoded`) to
+   `<casino>/api/welcome` as `tmpToken`, with
    `redirect=<casino>/<lang>/<redirect_link>?<page query>`, where `<casino>` is
    the host of `data.rules`. The template's confirmation screen — which shows a
    login and a password — is **never shown**.
-5. **Errors.** `{ "errors": ["…"] }` is read: "already registered" and
-   anything mentioning reCAPTCHA get their own message in UA / RU / EN
-   (`campaign.js § strings`: `err.exists`, `err.recaptcha`). Anything else,
+5. **Errors.** `{ "errors": ["…"] }` is read: "already registered" gets its
+   own message in UA / RU / EN (`err.exists`); anything mentioning reCAPTCHA
+   gets `err.recaptcha` in the form **and** a separate modal (`#pl-rc`, text
+   `pl.rc.text`). The server's own text is never shown. Anything else,
    including a network failure, is the template's generic "could not send".
    While the request runs the submit button is disabled.
 

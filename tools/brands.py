@@ -13,6 +13,14 @@ excluded) and fails on the other brand's name in any spelling, its domains,
 or the name of its dev landing, case-insensitive. The patterns are assembled
 from pieces below so that this file does not match itself.
 
+One exception, decision 24 (owner, 2026-11-12): TopWin and the other brand
+share one platform and database, and campaign.js `platform.dev` carries IT's
+own TEMP_CONFIG. The guard removes exactly three strings from campaign.js
+before it looks: the dev host and the two dev URLs listed in ALLOWED_IN_CAMPAIGN.
+Nothing else is allowed, there or anywhere: the other brand's support address,
+its casino domain, a different path on the dev host, or the dev host in any
+other file all still fail.
+
 Run:
     python tools/brands.py            # exit 1 and a file:line list on any hit
 """
@@ -34,6 +42,25 @@ _NAME = "jack" + r"[-_ .]?" + "pot"
 _LANDING = "land" + "330"
 PATTERN = re.compile("|".join([_NAME, _LANDING]), re.IGNORECASE)
 
+# The only text the other brand's name may appear in (decision 24), and only in
+# campaign.js: the dev host with exactly one of the two dev paths, each up to
+# and including the closing quote, so a longer path or another host fails.
+# Assembled from pieces for the same reason as the pattern.
+_DEV_HOST = "https://api2-land-dev." + "jack" + "-" + "pot" + ".tech"
+ALLOWED_IN_CAMPAIGN = [
+    _DEV_HOST + "/api/jp/registration/email'",
+    _DEV_HOST + "/api/jp/landing/8'",
+]
+CAMPAIGN = "campaign.js"
+
+
+def scrub(rel: str, line: str) -> str:
+    """The line with the exact allowed dev URLs removed, for campaign.js only."""
+    if rel == CAMPAIGN:
+        for ok in ALLOWED_IN_CAMPAIGN:
+            line = line.replace(ok, "")
+    return line
+
 
 def tracked_files():
     try:
@@ -52,10 +79,11 @@ def main() -> int:
         if not path.is_file():
             continue                      # deleted in the work tree, still in the index
         text = path.read_bytes().decode("utf-8", errors="replace")
+        rel = path.relative_to(ROOT).as_posix()
         for no, line in enumerate(text.splitlines(), 1):
-            m = PATTERN.search(line)
+            m = PATTERN.search(scrub(rel, line))
             if m:
-                hits.append("%s:%d: %s" % (path.relative_to(ROOT).as_posix(), no, m.group(0)))
+                hits.append("%s:%d: %s" % (rel, no, m.group(0)))
     if hits:
         print("brands: the other brand is named in %d place(s). TopWin and that brand are\n"
               "separate projects; a value TopWin does not have yet stays empty and is asked\n"

@@ -152,23 +152,22 @@ How it works:
    spread LAST, so one named like a field overwrites it, as on your page.
    `language` is the active language button lowercased, as in your template:
    `ua`, `ru` or `en`.
-4. Success -- PENDING YOUR ANSWER: which hand-off is right for TopWin? Today:
-   `response.data.accessToken` and `response.data.redirectUrl` come
-   back. The token is POSTed to `<mirror>/api/welcome` as `tmpToken`, where
-   `<mirror>` is the origin of `redirectUrl`, with `redirect` = `redirectUrl` plus
-   the page's query string. Without `redirectUrl` the fallback is
-   `<casino>/api/welcome`, with `redirect=<casino>/<lang>/<redirect_link>?<page query>`,
-   where `<casino>` is the host of `data.rules`. The confirmation screen that
-   shows a login and a password is never shown. Your template has only the
-   fallback path, behind a button the visitor clicks.
-5. Errors: `{{ errors: [msg] }}`. "already registered" and anything mentioning
-   reCAPTCHA get their own translated message; everything else is the generic
-   "could not send".
+4. Success -- as in your template: `response.data.accessToken` is read
+   (`redirectUrl` is not). A success modal opens, in TopWin's style, in
+   ua / ru / en. When the visitor clicks its button, the token is POSTed to
+   `<casino>/api/welcome` as `tmpToken`, with `redirect=<casino>/<lang>/
+   <redirect_link>?<page query>`, where `<casino>` is the host of
+   `data.rules`. The confirmation screen that shows a login and a password is
+   never shown.
+5. Errors: `{{ errors: [msg] }}`. "already registered" gets its own translated
+   message; anything mentioning reCAPTCHA gets its own translated message and
+   a separate modal; everything else is the generic "could not send". The
+   server's own text is never shown.
 
 **Development.** On localhost, 127.0.0.1 or `https://land-crm...` it uses
-`campaign.js` -> `platform.dev` once it holds a TopWin dev landing. It is
-EMPTY: please give us a TopWin dev landing (id, landing URL, registration
-URL). Until then localhost runs the demo path and land-crm reads
+`campaign.js` -> `platform.dev`, which holds your template's own TEMP_CONFIG
+(landing id 8 and its two URLs). A real TopWin dev landing replaces it when
+you issue one. Emptied, localhost runs the demo path and land-crm reads
 `config.json`.
 
 **Production.** The page fetches `config.json` from the site root:

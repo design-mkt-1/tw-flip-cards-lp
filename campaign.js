@@ -111,23 +111,28 @@ window.TW_CAMPAIGN = {
      Without that file the page is NOT connected: the form walks the demo
      confirmation screen and says so in the console.
 
-     `dev` is for a TopWin development landing, which IT has not issued yet.
-     Ask IT for its id and its two URLs and fill all three in. It is used
-     ONLY on localhost, 127.0.0.1 or an origin starting with https://land-crm,
-     and only when all three are set. While they are empty, localhost runs
-     the demo path (no request) and land-crm reads config.json. Never put
-     another brand's landing here (topwin-lp skill, decision 21).
+     `dev` is IT's own TEMP_CONFIG from their reference landing
+     (_js/enums/enums.js), copied verbatim (owner, 2026-11-12, decision 24).
+     TopWin and the other brand on this platform share one platform and one
+     database, so a registration made on localhost lands in landing 8 there;
+     the owner accepts that. It is used ONLY on localhost, 127.0.0.1 or an
+     origin containing https://land-crm, exactly the hosts IT's main.js uses,
+     and only when all three values are set. Empty them and localhost runs
+     the demo path (no request) and land-crm reads config.json. tools/brands.py
+     allows exactly these values and nothing else of the other brand. A real
+     TopWin dev landing, when IT issues one, replaces them.
 
      supportEmail is shown on the "unavailable" card: support@top-win.com
-     (owner, 2026-11-11). If it is ever emptied, the card shows no address
-     and uses pl.off.textNoMail, a sentence without "write to us". */
+     (owner, 2026-11-11, decision 21, confirmed 2026-11-12, decision 24). If it
+     is ever emptied, the card shows no address and uses pl.off.textNoMail, a
+     sentence without "write to us". */
   platform: {
     configUrl:    'config.json',
     supportEmail: 'support@top-win.com',
     dev: {
-      id: null,
-      email_registration: '',
-      landing:            ''
+      id: 8,
+      email_registration: 'https://api2-land-dev.jack-pot.tech/api/jp/registration/email',
+      landing:            'https://api2-land-dev.jack-pot.tech/api/jp/landing/8'
     }
   },
 
