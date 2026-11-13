@@ -126,9 +126,6 @@ async function landingMainJsCode() {
 
                     const landParams = getQueryParams();
 
-                    const domain = new URL(data.rules)
-                    registerFormState.domain = "https://" + domain.hostname
-
                     siteRules.href = data.rules
                         ? addParamsToUrl(data.rules, landParams)
                         : addParamsToUrl(siteRules.href, landParams);
@@ -246,20 +243,40 @@ async function landingMainJsCode() {
                         return res.json();
                     })
                     .then((response) => {
-                        const {accessToken} = response.data;
-                        const domain = registerFormState.domain;
+                        const {accessToken, redirectUrl} = response.data;
 
                         const landParams = getQueryParams();
 
-                        const redirectLang = (registerFormState._activeLang || 'en').toLowerCase()
+                        /* The SSO hand-off must target the platform origin, not the
+                           host inside `rules`. `rules` is the "Terms of use" link and
+                           may point at a redirect proxy (twredirect.com), which the
+                           platform answers with a 303 to an internal pod. The backend
+                           already resolves the real platform origin while following
+                           the affiliate click and appends the landing's redirect_link,
+                           so `data.redirectUrl` is the authoritative target:
+                           https://easy-topwin.icu/deposit */
+                        const ssoTarget = resolveSsoTarget(redirectUrl, accessToken);
 
-                        if (domain && accessToken) {
-                            const redirectDomain = domain + `/${redirectLang}/` + registerFormState.ladingData.redirect_link
-
-                            ssoForm.action = `${domain}/api/welcome`;
+                        if (ssoTarget) {
+                            ssoForm.action = `${ssoTarget.origin}/api/welcome`;
                             ssoFormTmpToken.value = accessToken;
-                            ssoFormRedirect.value = addParamsToUrl(redirectDomain, landParams) || "/";
+                            ssoFormRedirect.value = addParamsToUrl(ssoTarget.redirect, landParams) || "/";
                             successModal?.classList.add("active");
+                        } else {
+                            /* No redirectUrl (landing without a partner_link, or a
+                               platform response we could not resolve). Fall back to
+                               the old rules-derived domain so the visitor can still
+                               be handed off instead of being stuck on the modal. */
+                            const fallback = resolveLegacySsoTarget(registerFormState.ladingData, registerFormState._activeLang);
+
+                            if (fallback) {
+                                ssoForm.action = `${fallback.origin}/api/welcome`;
+                                ssoFormTmpToken.value = accessToken;
+                                ssoFormRedirect.value = addParamsToUrl(fallback.redirect, landParams) || "/";
+                                successModal?.classList.add("active");
+                            } else {
+                                console.error("Registration succeeded but no SSO target is available");
+                            }
                         }
                     })
                     .catch((err) => {
@@ -292,4 +309,55 @@ async function landingMainJsCode() {
     successModalBtn?.addEventListener("click", () => {
         ssoForm.submit();
     });
+}
+
+/**
+ * Splits the backend-provided `redirectUrl` into the platform origin (the SSO
+ * form target, `<origin>/api/welcome`) and the post-login redirect path.
+ *
+ * @param {string|undefined|null} redirectUrl
+ * @param {string|undefined|null} accessToken
+ * @returns {{origin: string, redirect: string}|null}
+ */
+function resolveSsoTarget(redirectUrl, accessToken) {
+    if (!accessToken || !redirectUrl) return null;
+
+    try {
+        const url = new URL(redirectUrl, window.location.origin);
+
+        return {
+            origin: url.origin,
+            redirect: url.origin + url.pathname + url.search,
+        };
+    } catch (error) {
+        console.error("Invalid redirectUrl from backend", redirectUrl, error);
+
+        return null;
+    }
+}
+
+/**
+ * Pre-fix behaviour, kept only as a safety net: the platform origin is taken
+ * from `rules` and the path is `/{lang}/{redirect_link}`.
+ *
+ * @param {Object|null} landing
+ * @param {string|null} activeLang
+ * @returns {{origin: string, redirect: string}|null}
+ */
+function resolveLegacySsoTarget(landing, activeLang) {
+    if (!landing || !landing.rules) return null;
+
+    try {
+        const origin = "https://" + new URL(landing.rules).hostname;
+        const lang = (activeLang || "en").toLowerCase();
+        const path = [lang, String(landing.redirect_link || "").replace(/^\/+/, "")]
+            .filter(Boolean)
+            .join("/");
+
+        return {origin, redirect: origin + "/" + path};
+    } catch (error) {
+        console.error("Could not derive a legacy SSO target", landing && landing.rules, error);
+
+        return null;
+    }
 }

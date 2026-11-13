@@ -13,10 +13,10 @@ Decision 25 (owner, 2026-11-12): registration and connection are IT's
 test6637.zip, 1:1. So this test checks two things.
 
   1. The copy is IT's. js/it/*, css/it/* and assets/img/it/* are compared by
-     hash with the files in IT's archive (newline-normalised). main.js differs
-     in exactly one thing, IT's support address -> support@top-win.com, and
-     form-text.js in the lines that give UA and RU IT's English. Both are
-     proven by undoing the change and hashing again.
+     hash with the files in IT's archive (newline-normalised). main.js is IT's
+     flip_cards (1).zip version (SSO from the registration response's
+     `redirectUrl`) byte for byte; form-text.js differs in the lines that give
+     UA and RU IT's English, proven by undoing the change and hashing again.
   2. The page behaves as IT's does, in ua / ru / en:
        config / landing      development branch (127.0.0.1): TEMP_CONFIG, landing 8;
                              a production origin: config.json first, then its landing
@@ -25,7 +25,9 @@ test6637.zip, 1:1. So this test checks two things.
        validation            IT's English messages
        success               IT's success modal (their texts, their check icon),
                              the pop-up closed, NOTHING posted until its button is
-                             clicked, then #sso POST <rules host>/api/welcome
+                             clicked, then #sso POST. With `redirectUrl` in the response:
+                             origin(redirectUrl)/api/welcome; without it, the
+                             fallback <rules host>/api/welcome
        errors                the raw server message in the email error; the exact
                              reCAPTCHA string opens IT's error modal (a near miss does
                              not); a browser-side reCAPTCHA failure opens it too
@@ -91,10 +93,11 @@ TAKEN = 'Email already registered. Please use a different email or login.'
 BODY_KEYS = ['email', 'password', 'landing_id', 'language', 'currency', 'country', 'promocode',
              'receivePromos', 'clientIp', 'lang', 'g-recaptcha-response']
 
-# sha256 of IT's files in test6637.zip, newline-normalised; repo path -> hash.
+# sha256 of IT's files in test6637.zip (main.js: flip_cards (1).zip, 2026-11-13),
+# newline-normalised; repo path -> hash.
 IT_ORIGINAL = {
     'js/it/main.js':
-        '7c72405d00094cbbab3957a56fd24d9d8f591c96cb0c8456b3002a11bd4f4e43',
+        'b9a61fd0e4369529396fa2096b1025edcf7cf053c93ca0d79591058c0aac3646',
     'js/it/analytics.js':
         '391649c5d48a9f12217ef63bbcc9864b8537d40e0b4d4c65e0ecbcc6c06d5e55',
     'js/it/enums/enums.js':
@@ -224,8 +227,8 @@ def main():
     for rel, want in IT_ORIGINAL.items():
         got = read(rel)
         if rel == 'js/it/main.js':
-            check('copy: ' + rel + ' = IT\'s, but for the support address',
-                  sha(got.replace(SUPPORT, OTHER_SUPPORT)) == want and got.count(SUPPORT) == 2,
+            check('copy: ' + rel + ' = IT\'s flip_cards (1).zip version, byte for byte',
+                  sha(got) == want and got.count(SUPPORT) == 2,
                   'hash differs or the support address is not on exactly two lines')
         elif rel == 'js/it/enums/form-text.js':
             head = got.replace('\r\n', '\n')
@@ -311,7 +314,7 @@ def main():
                 r.settle(300)
                 check(tag + 'NOTHING is posted to the casino before the button is clicked', not st['sso'], str(st['sso']))
                 action = r.page.evaluate('document.getElementById("sso").getAttribute("action")')
-                check(tag + '#sso action = <rules host>/api/welcome', action == stubmod.CASINO + '/api/welcome', action)
+                check(tag + 'redirectUrl absent: #sso action = <rules host>/api/welcome (fallback)', action == stubmod.CASINO + '/api/welcome', action)
                 r.page.click('.success-modal__btn')
                 check(tag + 'the button submits #sso', r.wait(lambda: bool(st['sso']), 6000))
                 want = ('tmpToken=TMP-TOKEN-123&redirect=' +
@@ -319,6 +322,37 @@ def main():
                 check(tag + 'SSO POST: tmpToken and redirect = host/<lang>/<redirect_link>?<page query>',
                       st['sso'] and st['sso'][0]['method'] == 'POST'
                       and st['sso'][0]['url'] == stubmod.CASINO + '/api/welcome'
+                      and st['sso'][0]['body'] == want, str(st['sso']))
+                check(tag + 'console clean, nothing left the page', not r.errors and not st['leaks'],
+                      str(r.errors + st['leaks']))
+                r.close()
+
+            # ── 2b. SSO from IT's `redirectUrl` (flip_cards (1).zip, 2026-11-13) ──
+            for lang in LANGS:
+                ru = stubmod.PLATFORM + '/uk/deposit?src=x'
+                r = Run(browser, base, register_json={'data': {'accessToken': 'TMP-TOKEN-123',
+                                                              'redirectUrl': ru}}).open(lang)
+                st = r.state
+                tag = '[%s] redirectUrl present: ' % lang
+                r.submit()
+                check(tag + 'success modal opens', r.wait(lambda: r.active('.success-modal'), 6000))
+                r.settle(300)
+                action = r.page.evaluate('document.getElementById("sso").getAttribute("action")')
+                check(tag + '#sso action = origin(redirectUrl)/api/welcome, not the rules host',
+                      action == stubmod.PLATFORM + '/api/welcome', action)
+                fields = r.page.evaluate('''() => [...document.querySelectorAll("#sso input")]
+                    .map(i => [i.name, i.value])''')
+                want_redirect = '%s&lang=%s' % (ru, lang)
+                check(tag + 'tmpToken is set and the redirect field = redirectUrl (+ page query)',
+                      ['tmpToken', 'TMP-TOKEN-123'] in fields and ['redirect', want_redirect] in fields,
+                      str(fields))
+                check(tag + 'NOTHING is posted before the button is clicked', not st['sso'], str(st['sso']))
+                r.page.click('.success-modal__btn')
+                check(tag + 'the button submits #sso', r.wait(lambda: bool(st['sso']), 6000))
+                want = 'tmpToken=TMP-TOKEN-123&redirect=' + quote_plus(want_redirect, safe='')
+                check(tag + 'SSO POST: platform origin, tmpToken and redirect',
+                      st['sso'] and st['sso'][0]['method'] == 'POST'
+                      and st['sso'][0]['url'] == stubmod.PLATFORM + '/api/welcome'
                       and st['sso'][0]['body'] == want, str(st['sso']))
                 check(tag + 'console clean, nothing left the page', not r.errors and not st['leaks'],
                       str(r.errors + st['leaks']))

@@ -33,6 +33,9 @@ API = 'https://api2-land-prod.top-win.promo'
 SITE = 'http://lp.test'
 # Shaped like the live casino host topwin-bet.club, on the reserved .test TLD.
 CASINO = 'https://casino.topwin-bet.test'
+# Where the backend's `redirectUrl` points (IT flip_cards, 2026-11-13): the real
+# platform origin, which differs from the `rules` host above.
+PLATFORM = 'https://platform.topwin-bet.test'
 # The analytics and fingerprint hosts. Answered with an empty script.
 FINGERPRINT = 'https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3.3.3/'
 EMPTY_SCRIPT_HOSTS = (
@@ -61,6 +64,8 @@ def new_state(**over):
     state = {
         'active': True,
         'register_status': 200,
+        # Add 'redirectUrl': <url> to data to take IT's redirectUrl path; without
+        # it main.js falls back to the rules host + /<lang>/<redirect_link>.
         'register_json': {'data': {'accessToken': 'TMP-TOKEN-123'}},
         'casino_rules': True,   # False: the landing has no rules URL
         'register_abort': False,
@@ -166,7 +171,7 @@ def install(context, state, local_prefixes):
             return route.fulfill(status=200, headers=CORS, content_type='application/json',
                                  body='{"ip":"203.0.113.7"}')
 
-        if url.startswith(CASINO + '/api/welcome'):
+        if url.startswith(CASINO + '/api/welcome') or url.startswith(PLATFORM + '/api/welcome'):
             state['sso'].append({'url': url, 'body': req.post_data or '',
                                  'method': req.method})
             return route.fulfill(status=200, content_type='text/html',
